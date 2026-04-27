@@ -168,15 +168,42 @@ calculate() {
 
     # 6. Handle Degree Conversion
     if [[ "$ANGLE_MODE" == "deg" ]]; then
+        # Domain Check: tan(90), tan(270), etc.
+        if [[ "$expr" =~ tan\(([^)]+)\) ]]; then
+            local angle=$(echo "${BASH_REMATCH[1]}" | bc -l 2>/dev/null || awk "BEGIN { print ${BASH_REMATCH[1]} }")
+            if is_num "$angle"; then
+                local check=$(awk "BEGIN { print (($angle - 90) % 180 == 0) }")
+                if [[ "$check" == "1" ]]; then
+                    echo -e "${RED}ERR: TAN UNDEFINED AT $((angle))°${NC}"
+                    return 1
+                fi
+            fi
+        fi
         expr=$(echo "$expr" | sed -E \
-            -e "s/sin\(([^)]+)\)/SIN((\1)*$PI_VAL\/180)/g" \
-            -e "s/cos\(([^)]+)\)/COS((\1)*$PI_VAL\/180)/g" \
-            -e "s/tan\(([^)]+)\)/TAN((\1)*$PI_VAL\/180)/g")
+            -e "s/sin\(([^)]+)\)/SIN((\1)*${PI_VAL}\/180)/g" \
+            -e "s/cos\(([^)]+)\)/COS((\1)*${PI_VAL}\/180)/g" \
+            -e "s/tan\(([^)]+)\)/TAN((\1)*${PI_VAL}\/180)/g")
     else
         expr=$(echo "$expr" | sed -E -e 's/sin\(([^)]+)\)/SIN(\1)/g' -e 's/cos\(([^)]+)\)/COS(\1)/g' -e 's/tan\(([^)]+)\)/TAN(\1)/g')
     fi
 
-    # 7. Handle 'v' root, 'exp', and 'log' functions
+    # 7. Domain Validation (Log/Ln/Sqrt)
+    if [[ "$expr" =~ (ln|log|sqrt)\(([^)]+)\) ]]; then
+        local func="${BASH_REMATCH[1]}"
+        local val_expr="${BASH_REMATCH[2]}"
+        local val=$(echo "$val_expr" | bc -l 2>/dev/null || awk "BEGIN { print $val_expr }")
+        if is_num "$val"; then
+            if [[ "$func" =~ ^l && $(awk "BEGIN { print ($val <= 0) }") == "1" ]]; then
+                echo -e "${RED}ERR: $func UNDEFINED FOR $val${NC}"
+                return 1
+            elif [[ "$func" == "sqrt" && $(awk "BEGIN { print ($val < 0) }") == "1" ]]; then
+                echo -e "${RED}ERR: SQRT OF NEGATIVE NUMBER${NC}"
+                return 1
+            fi
+        fi
+    fi
+
+    # 8. Handle 'v' root, 'exp', and 'log' functions
     expr=$(echo "$expr" | sed -E \
         -e 's/([0-9.eE+-]+) v ([0-9.eE+-]+)/ROOT(\1,\2)/g' \
         -e 's/exp\(([^)]+)\)/EXP(\1)/g' -e 's/ln\(([^)]+)\)/LN(\1)/g' \
