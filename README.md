@@ -56,10 +56,7 @@ The system uses a cyberpunk-themed ASCII interface with dedicated navigation key
     ```
 
 ## 🕵️ Easter Eggs
-The system contains several hidden modes. Try typing these at the main prompt:
-- `itachi` / `sharingan`
-- `assassin`
-- `templar`
+The system contains several hidden modes. Try typing these at the main prompt and they will appear
 
 ---
 
