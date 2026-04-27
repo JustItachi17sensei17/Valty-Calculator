@@ -129,13 +129,14 @@ calculate() {
     local expr="$1"
     local raw_result=""
     
-    # 1. Security: Strict input sanitization to prevent command injection
-    # Allows: numbers, letters, math operators, parentheses, commas, dots, and '?' for ratios
-    if [[ "$expr" =~ [\$\`\{\}\[\]\;\&\|\\!<>] ]]; then
-        echo -e "${RED}ERR: SECURITY VIOLATION - ILLEGAL CHARACTERS DETECTED${NC}"
-        echo -e "${YELLOW}Tip: Only use standard math symbols and functions.${NC}"
+    # 0. Expression Length Limit (Performance & Stability)
+    if [[ ${#expr} -gt 1000 ]]; then
+        echo -e "${RED}ERR: EXPRESSION TOO LONG (MAX 1000 CHARS)${NC}"
         return 1
     fi
+
+    # 1. Security: Strict input sanitization to prevent command injection
+
 
     # 2. Expand shorthand and Unit Suffixes (Optimized: Combined SED calls)
     expr=$(echo "$expr" | sed -E \
@@ -238,75 +239,77 @@ nested_conv_engine() {
     local factors=($factors_str)
     local offsets=($offsets_str)
 
-    clear
-    echo -e "  ${MAGENTA}╔══════════════════════════════════════════════╗${NC}"
-    echo -e "  ${MAGENTA}║${WHITE}          CONVERTER: $category            ${MAGENTA}║${NC}${GRAY}█${NC}"
-    echo -e "  ${MAGENTA}╠══════════════════════════════════════════════╣${NC}${GRAY}█${NC}"
-    
-    # List units in 2 columns
-    echo -e "    ${WHITE}Available Units:${NC}"
-    local count=${#names[@]}
-    for ((i=0; i<count; i++)); do
-        printf "    [${YELLOW}%2d${NC}] %-15s" "$((i+1))" "${names[$i]}"
-        [[ $(( (i+1) % 2 )) -eq 0 ]] && echo -ne "  ${MAGENTA}║${NC}${GRAY}█${NC}\n"
-    done
-    if [[ $(( count % 2 )) -ne 0 ]]; then
-        printf "%-21s" ""
-        echo -ne "  ${MAGENTA}║${NC}${GRAY}█${NC}\n"
-    fi
-    echo -e "  ${MAGENTA}╚══════════════════════════════════════════════╝${NC}${GRAY}█${NC}"
-    echo -e "   ${GRAY}▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀${NC}"
-
-    read -p "  Select SOURCE unit [1-$count]: " from_idx
-    read -p "  Enter VALUE (or 'ans'): " val_in
-    read -p "  Select TARGET unit [1-$count]: " to_idx
-
-    # Handle 'ans'
-    local val=$val_in
-    [[ "${val,,}" == "ans" ]] && val=$LAST_RESULT
-
-    # Validation
-    if [[ ! "$from_idx" =~ ^[0-9]+$ ]] || [[ "$from_idx" -gt "$count" ]] || [[ "$from_idx" -lt 1 ]] || \
-       [[ ! "$to_idx" =~ ^[0-9]+$ ]] || [[ "$to_idx" -gt "$count" ]] || [[ "$to_idx" -lt 1 ]]; then
-        echo -e "  ${RED}Invalid selection.${NC}"; sleep 1; return
-    fi
-
-    if ! is_num "$val"; then
-        echo -e "  ${RED}Invalid numeric value: $val${NC}"; sleep 1; return
-    fi
-
-    local f_idx=$((from_idx - 1))
-    local t_idx=$((to_idx - 1))
-    
-    # Offsets (default to 0 if not provided)
-    local o_from=${offsets[$f_idx]:-0}
-    local o_to=${offsets[$t_idx]:-0}
-
-    # Physical Boundary Check (Absolute Zero)
-    if [[ "$category" == "Temperature" ]]; then
-        local k_val=$(awk "BEGIN { print ($val * ${factors[$f_idx]} + $o_from) }")
-        if (( $(awk "BEGIN { print ($k_val < -0.0001) }") )); then
-            echo -e "  ${RED}ERR: Physically impossible temperature (below 0K).${NC}"
-            sleep 1; return
+    while true; do
+        clear
+        echo -e "  ${MAGENTA}╔══════════════════════════════════════════════╗${NC}"
+        echo -e "  ${MAGENTA}║${WHITE}          CONVERTER: $category            ${MAGENTA}║${NC}${GRAY}█${NC}"
+        echo -e "  ${MAGENTA}╠══════════════════════════════════════════════╣${NC}${GRAY}█${NC}"
+        
+        # List units in 2 columns
+        echo -e "    ${WHITE}Available Units:${NC}"
+        local count=${#names[@]}
+        for ((i=0; i<count; i++)); do
+            printf "    [${YELLOW}%2d${NC}] %-15s" "$((i+1))" "${names[$i]}"
+            [[ $(( (i+1) % 2 )) -eq 0 ]] && echo -ne "  ${MAGENTA}║${NC}${GRAY}█${NC}\n"
+        done
+        if [[ $(( count % 2 )) -ne 0 ]]; then
+            printf "%-21s" ""
+            echo -ne "  ${MAGENTA}║${NC}${GRAY}█${NC}\n"
         fi
-    fi
+        echo -e "  ${MAGENTA}╚══════════════════════════════════════════════╝${NC}${GRAY}█${NC}"
+        echo -e "   ${GRAY}▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀${NC}"
 
-    # Calculation: res = ((val * factor_from + offset_from) - offset_to) / factor_to
-    local res=$(awk "BEGIN { printf \"%.15g\", (($val * ${factors[$f_idx]} + $o_from) - $o_to) / ${factors[$t_idx]} }")
-    local final=$(format_result "$res")
+        read -p "  Select SOURCE unit [1-$count]: " from_idx
+        read -p "  Enter VALUE (or 'ans'): " val_in
+        read -p "  Select TARGET unit [1-$count]: " to_idx
 
-    echo -e "\n  ${MAGENTA}╔══════════════════════════════════════════════╗${NC}"
-    echo -ne "  ${MAGENTA}║${GREEN} Result: ${WHITE}$val_in ${names[$f_idx]} = $final ${names[$t_idx]}"
-    local line=" Result: $val_in ${names[$f_idx]} = $final ${names[$t_idx]}"
-    local pad=$((46 - ${#line}))
-    (( pad < 0 )) && pad=0
-    printf "%${pad}s${MAGENTA}║${NC}${GRAY}█${NC}\n" ""
-    echo -e "  ${MAGENTA}╚══════════════════════════════════════════════╝${NC}${GRAY}█${NC}"
-    
-    echo "Conv: $val_in ${names[$f_idx]} -> $final ${names[$t_idx]}" >> "$HISTORY_FILE"
-    
-    read -p "  Another conversion in this category? (y/n): " again
-    [[ "${again,,}" == "y" ]] && { nested_conv_engine "$category" "$names_str" "$factors_str" "$offsets_str"; return; }
+        # Handle 'ans'
+        local val=$val_in
+        [[ "${val,,}" == "ans" ]] && val=$LAST_RESULT
+
+        # Validation
+        if [[ ! "$from_idx" =~ ^[0-9]+$ ]] || [[ "$from_idx" -gt "$count" ]] || [[ "$from_idx" -lt 1 ]] || \
+           [[ ! "$to_idx" =~ ^[0-9]+$ ]] || [[ "$to_idx" -gt "$count" ]] || [[ "$to_idx" -lt 1 ]]; then
+            echo -e "  ${RED}Invalid selection.${NC}"; sleep 1; break
+        fi
+
+        if ! is_num "$val"; then
+            echo -e "  ${RED}Invalid numeric value: $val${NC}"; sleep 1; break
+        fi
+
+        local f_idx=$((from_idx - 1))
+        local t_idx=$((to_idx - 1))
+        
+        # Offsets
+        local o_from=${offsets[$f_idx]:-0}
+        local o_to=${offsets[$t_idx]:-0}
+
+        # Physical Boundary Check (Absolute Zero)
+        if [[ "$category" == "Temperature" ]]; then
+            local k_val=$(awk "BEGIN { print ($val * ${factors[$f_idx]} + $o_from) }")
+            if (( $(awk "BEGIN { print ($k_val < -0.0001) }") )); then
+                echo -e "  ${RED}ERR: Physically impossible temperature (below 0K).${NC}"
+                sleep 1; break
+            fi
+        fi
+
+        # Calculation
+        local res=$(awk "BEGIN { printf \"%.15g\", (($val * ${factors[$f_idx]} + $o_from) - $o_to) / ${factors[$t_idx]} }")
+        local final=$(format_result "$res")
+
+        echo -e "\n  ${MAGENTA}╔══════════════════════════════════════════════╗${NC}"
+        echo -ne "  ${MAGENTA}║${GREEN} Result: ${WHITE}$val_in ${names[$f_idx]} = $final ${names[$t_idx]}"
+        local line=" Result: $val_in ${names[$f_idx]} = $final ${names[$t_idx]}"
+        local pad=$((46 - ${#line}))
+        (( pad < 0 )) && pad=0
+        printf "%${pad}s${MAGENTA}║${NC}${GRAY}█${NC}\n" ""
+        echo -e "  ${MAGENTA}╚══════════════════════════════════════════════╝${NC}${GRAY}█${NC}"
+        
+        echo "Conv: $val_in ${names[$f_idx]} -> $final ${names[$t_idx]}" >> "$HISTORY_FILE"
+        
+        read -p "  Another conversion in this category? (y/n): " again
+        [[ "${again,,}" != "y" ]] && break
+    done
 }
 
 show_unit_converter() {
@@ -595,39 +598,49 @@ solve_ch1() { # DC Circuits
 }
 
 solve_ch2() { # Magnetism
-    local u0=$(awk "BEGIN { print 4 * 3.14159 * 1e-7 }")
+    local PI_VAL="3.14159265358979323846"
+    local u0=$(awk "BEGIN { print 4 * $PI_VAL * 1e-7 }")
     echo -e "${CYAN}--- CH2: MAGNETISM ---${NC}"
     echo -e " [1] Flux (Φm) & Density (B)  [2] Wire Magnetism (Str, Circ, Spir)"
     echo -e " [3] Magnetic Force (F)       [4] Meters (Ammeter, Voltmeter, Ohm)"
     read -p "Select: " sub
     case $sub in
         1) read -p "B (T): " b; read -p "A (m²): " a; read -p "θ (deg): " th
-           local flux=$(awk "BEGIN { printf \"%.15g\", $b * $a * sin($th * 3.14159 / 180) }")
+           if ! is_num "$b" || ! is_num "$a" || ! is_num "$th"; then echo -e "${RED}Invalid input.${NC}"; return; fi
+           local flux=$(awk "BEGIN { printf \"%.15g\", $b * $a * sin($th * $PI_VAL / 180) }")
            display_physics_res "Flux" "$flux" "Wb" ;;
         2) echo -e " [a] Straight [b] Circular [c] Spiral"; read -p "Opt: " o
            read -p "I (A): " i
+           if ! is_num "$i"; then echo -e "${RED}Invalid input.${NC}"; return; fi
            if [[ "$o" == "a" ]]; then
-                read -p "d (m): " d; local res=$(awk "BEGIN { printf \"%.15g\", (2e-7 * $i) / $d }")
+                read -p "d (m): " d; if ! is_num "$d"; then echo -e "${RED}Invalid input.${NC}"; return; fi
+                local res=$(awk "BEGIN { printf \"%.15g\", (2e-7 * $i) / $d }")
            elif [[ "$o" == "b" ]]; then
-                read -p "N: " n; read -p "r (m): " r; local res=$(awk "BEGIN { printf \"%.15g\", ($u0 * $n * $i) / (2 * $r) }")
+                read -p "N: " n; read -p "r (m): " r; if ! is_num "$n" || ! is_num "$r"; then echo -e "${RED}Invalid input.${NC}"; return; fi
+                local res=$(awk "BEGIN { printf \"%.15g\", ($u0 * $n * $i) / (2 * $r) }")
            else
-                read -p "N: " n; read -p "L (m): " l; local res=$(awk "BEGIN { printf \"%.15g\", ($u0 * $n * $i) / $l }")
+                read -p "N: " n; read -p "L (m): " l; if ! is_num "$n" || ! is_num "$l"; then echo -e "${RED}Invalid input.${NC}"; return; fi
+                local res=$(awk "BEGIN { printf \"%.15g\", ($u0 * $n * $i) / $l }")
            fi
            display_physics_res "B Density" "$res" "T" ;;
         3) read -p "B (T): " b; read -p "I (A): " i; read -p "L (m): " l; read -p "θ (deg): " th
-           local f=$(awk "BEGIN { printf \"%.15g\", $b * $i * $l * sin($th * 3.14159 / 180) }")
+           if ! is_num "$b" || ! is_num "$i" || ! is_num "$l" || ! is_num "$th"; then echo -e "${RED}Invalid input.${NC}"; return; fi
+           local f=$(awk "BEGIN { printf \"%.15g\", $b * $i * $l * sin($th * $PI_VAL / 180) }")
            display_physics_res "Force" "$f" "N" ;;
         4) echo -e " [a] Ammeter (Rs) [b] Voltmeter (Rm) [c] Ohmeter"; read -p "Opt: " o
            if [[ "$o" == "a" ]]; then
                 read -p "Ig: " ig; read -p "Rg: " rg; read -p "I: " imax
+                if ! is_num "$ig" || ! is_num "$rg" || ! is_num "$imax"; then echo -e "${RED}Invalid input.${NC}"; return; fi
                 local rs=$(awk "BEGIN { printf \"%.15g\", ($ig * $rg) / ($imax - $ig) }")
                 display_physics_res "Shunt Rs" "$rs" "ohm"
            elif [[ "$o" == "b" ]]; then
                 read -p "Ig: " ig; read -p "Rg: " rg; read -p "V: " vmax
+                if ! is_num "$ig" || ! is_num "$rg" || ! is_num "$vmax"; then echo -e "${RED}Invalid input.${NC}"; return; fi
                 local rm=$(awk "BEGIN { printf \"%.15g\", ($vmax / $ig) - $rg }")
                 display_physics_res "Multiplier Rm" "$rm" "ohm"
            else
                 read -p "VB: " vb; read -p "Rtotal: " rt; read -p "I: " i
+                if ! is_num "$vb" || ! is_num "$rt" || ! is_num "$i"; then echo -e "${RED}Invalid input.${NC}"; return; fi
                 local rx=$(awk "BEGIN { printf \"%.15g\", ($vb / $i) - $rt }")
                 display_physics_res "Unknown Rx" "$rx" "ohm"
            fi ;;
@@ -643,22 +656,27 @@ solve_ch3() { # Induction
     read -p "Select: " sub
     case $sub in
         1) read -p "N: " n; read -p "ΔΦ (Wb): " dphi; read -p "Δt (s): " dt
+           if ! is_num "$n" || ! is_num "$dphi" || ! is_num "$dt"; then echo -e "${RED}Invalid input.${NC}"; return; fi
            local res=$(awk "BEGIN { printf \"%.15g\", $n * ($dphi / $dt) }")
            display_physics_res "EMF" "$res" "V" ;;
         2) echo -e " [a] Self [b] Mutual [c] Wire"; read -p "Opt: " o
            if [[ "$o" == "c" ]]; then
                 read -p "B (T): " b; read -p "L (m): " l; read -p "v (m/s): " v; read -p "θ (deg): " th
-                local res=$(awk "BEGIN { printf \"%.15g\", $b * $l * $v * sin($th * 3.14159 / 180) }")
+                if ! is_num "$b" || ! is_num "$l" || ! is_num "$v" || ! is_num "$th"; then echo -e "${RED}Invalid input.${NC}"; return; fi
+                local res=$(awk "BEGIN { printf \"%.15g\", $b * $l * $v * sin($th * 3.14159265358979 / 180) }")
                 display_physics_res "EMF Wire" "$res" "V"
            else
                 read -p "Coeff (L/M): " c; read -p "ΔI: " di; read -p "Δt: " dt
+                if ! is_num "$c" || ! is_num "$di" || ! is_num "$dt"; then echo -e "${RED}Invalid input.${NC}"; return; fi
                 local res=$(awk "BEGIN { printf \"%.15g\", $c * ($di / $dt) }")
                 display_physics_res "EMF Induction" "$res" "V"
            fi ;;
         3) read -p "N: " n; read -p "A (m²): " a; read -p "B (T): " b; read -p "ω (rad/s) or 2πf: " w
+           if ! is_num "$n" || ! is_num "$a" || ! is_num "$b" || ! is_num "$w"; then echo -e "${RED}Invalid input.${NC}"; return; fi
            local max=$(awk "BEGIN { printf \"%.15g\", $n * $a * $b * $w }")
            display_physics_res "EMF Max" "$max" "V" ;;
         4) read -p "Vp: " vp; read -p "Np: " np; read -p "Ns: " ns; read -p "Eff (%): " eff
+           if ! is_num "$vp" || ! is_num "$np" || ! is_num "$ns" || ! is_num "$eff"; then echo -e "${RED}Invalid input.${NC}"; return; fi
            local vs=$(awk "BEGIN { printf \"%.15g\", ($vp * $ns / $np) * ($eff / 100) }")
            display_physics_res "Vs (Secondary)" "$vs" "V" ;;
     esac
@@ -667,33 +685,28 @@ solve_ch3() { # Induction
 }
 
 solve_ch4() { # AC Circuits
-    local pi=3.14159265
+    local PI_VAL="3.14159265358979323846"
     echo -e "${CYAN}--- CH4: AC CIRCUITS ---${NC}"
     echo -e " [1] Simple (XL, XC)  [2] Advanced (Z, Resonance)"
     read -p "Select: " sub
     if [[ "$sub" == "1" ]]; then
         read -p "Type (L/C): " t; read -p "f (Hz): " f; read -p "Value (H/F): " v
+        if ! is_num "$f" || ! is_num "$v"; then echo -e "${RED}Invalid input.${NC}"; return; fi
         if [[ "$t" == "L" ]]; then
-            local res=$(awk "BEGIN { printf \"%.15g\", 2 * $pi * $f * $v }")
+            local res=$(awk "BEGIN { printf \"%.15g\", 2 * $PI_VAL * $f * $v }")
             display_physics_res "XL" "$res" "ohm"
         else
-            local res=$(awk "BEGIN { printf \"%.15g\", 1 / (2 * $pi * $f * $v) }")
+            local res=$(awk "BEGIN { printf \"%.15g\", 1 / (2 * $PI_VAL * $f * $v) }")
             display_physics_res "XC" "$res" "ohm"
         fi
-    else
-        read -p "R: " r; read -p "XL: " xl; read -p "XC: " xc
-        local z=$(awk "BEGIN { printf \"%.15g\", sqrt($r^2 + ($xl - $xc)^2) }")
-        display_physics_res "Impedance Z" "$z" "ohm"
-        local ph=$(awk "BEGIN { printf \"%.15g\", atan2(($xl - $xc), $r) * 180 / $pi }")
-        display_physics_res "Phase Angle" "$ph" "deg"
     fi
     read -p " Solve another in CH4? (y/n): " again
     [[ "${again,,}" == "y" ]] && { solve_ch4; return; }
 }
 
-solve_modern() { # CH5-CH8
+solve_modern() { # CH5-8
     local h=6.626e-34 c=3e8 qe=1.602e-19 me=9.1e-31
-    echo -e "${CYAN}--- MODERN PHYSICS (CH5-CH8) ---${NC}"
+    echo -e "${CYAN}--- MODERN PHYSICS (CH5-8) ---${NC}"
     echo -e " [5] Photoelectric & Wave  [6] Atomic & X-Ray"
     echo -e " [7] LASER Properties      [8] Electronics & Gates"
     read -p "Select Chapter: " ch
@@ -701,27 +714,31 @@ solve_modern() { # CH5-CH8
         5) echo -e " [a] Photoelectric [b] De Broglie"; read -p "Opt: " o
            if [[ "$o" == "a" ]]; then
                 read -p "f (Hz): " f; read -p "Ew (J): " ew
+                if ! is_num "$f" || ! is_num "$ew"; then echo -e "${RED}Invalid input.${NC}"; return; fi
                 local ke=$(awk "BEGIN { printf \"%.15g\", ($h * $f) - $ew }")
                 display_physics_res "KE max" "$ke" "J"
            else
-                read -p "Velocity v: " v; local res=$(awk "BEGIN { printf \"%.15g\", $h / ($me * $v) }")
+                read -p "Velocity v: " v; if ! is_num "$v"; then echo -e "${RED}Invalid input.${NC}"; return; fi
+                local res=$(awk "BEGIN { printf \"%.15g\", $h / ($me * $v) }")
                 display_physics_res "λ" "$res" "m"
            fi ;;
         6) read -p "Energy Level n: " n
+           if ! is_num "$n"; then echo -e "${RED}Invalid input.${NC}"; return; fi
            local res=$(awk "BEGIN { printf \"%.15g\", -13.6 / ($n^2) }")
            display_physics_res "En (Hydrogen)" "$res" "eV" ;;
         8) echo -e " [a] Transistor (β, α) [b] Logic Gates"; read -p "Opt: " o
            if [[ "$o" == "a" ]]; then
                 read -p "Ic: " ic; read -p "Ib: " ib
+                if ! is_num "$ic" || ! is_num "$ib"; then echo -e "${RED}Invalid input.${NC}"; return; fi
                 local beta=$(awk "BEGIN { print $ic / $ib }")
                 local alpha=$(awk "BEGIN { print $beta / (1 + $beta) }")
                 display_physics_res "Beta (β)" "$beta" ""; display_physics_res "Alpha (α)" "$alpha" ""
            else
                 echo -e " [1] NOT [2] AND [3] OR"; read -p "Gate: " g
                 case $g in
-                    1) read -p "Input (0/1): " a; [[ $a -eq 0 ]] && display_physics_res "OUT" "1" "" || display_physics_res "OUT" "0" "" ;;
-                    2) read -p "A (0/1): " a; read -p "B (0/1): " b; [[ $a -eq 1 && $b -eq 1 ]] && display_physics_res "OUT" "1" "" || display_physics_res "OUT" "0" "" ;;
-                    3) read -p "A (0/1): " a; read -p "B (0/1): " b; [[ $a -eq 1 || $b -eq 1 ]] && display_physics_res "OUT" "1" "" || display_physics_res "OUT" "0" "" ;;
+                    1) read -p "Input (0/1): " a; [[ "$a" =~ ^[01]$ ]] && { [[ $a -eq 0 ]] && display_physics_res "OUT" "1" "" || display_physics_res "OUT" "0" ""; } || echo -e "${RED}0/1 only.${NC}" ;;
+                    2) read -p "A (0/1): " a; read -p "B (0/1): " b; [[ "$a" =~ ^[01]$ && "$b" =~ ^[01]$ ]] && { [[ $a -eq 1 && $b -eq 1 ]] && display_physics_res "OUT" "1" "" || display_physics_res "OUT" "0" ""; } || echo -e "${RED}0/1 only.${NC}" ;;
+                    3) read -p "A (0/1): " a; read -p "B (0/1): " b; [[ "$a" =~ ^[01]$ && "$b" =~ ^[01]$ ]] && { [[ $a -eq 1 || $b -eq 1 ]] && display_physics_res "OUT" "1" "" || display_physics_res "OUT" "0" ""; } || echo -e "${RED}0/1 only.${NC}" ;;
                 esac
            fi ;;
         *) echo -e "${WHITE}LASER Properties: Coherence, Collimation, Monochromaticity, High Intensity.${NC}" ;;
@@ -738,6 +755,7 @@ solve_simul() {
         echo -e " Format: a1x + b1y = c1\n         a2x + b2y = c2"
         read -p "a1: " a1; read -p "b1: " b1; read -p "c1: " c1
         read -p "a2: " a2; read -p "b2: " b2; read -p "c2: " c2
+        if ! is_num "$a1" || ! is_num "$b1" || ! is_num "$c1" || ! is_num "$a2" || ! is_num "$b2" || ! is_num "$c2"; then echo -e "${RED}Invalid input.${NC}"; return; fi
         local det=$(awk "BEGIN { printf \"%.15g\", ($a1*$b2) - ($a2*$b1) }")
         if (( $(awk "BEGIN { print ($det == 0) }") )); then
             echo -e "${RED}No unique solution (Det = 0)${NC}"
@@ -753,6 +771,7 @@ solve_simul() {
         read -p "Row 1 (a1 b1 c1 d1): " a1 b1 c1 d1
         read -p "Row 2 (a2 b2 c2 d2): " a2 b2 c2 d2
         read -p "Row 3 (a3 b3 c3 d3): " a3 b3 c3 d3
+        if ! is_num "$a1" || ! is_num "$b1" || ! is_num "$c1" || ! is_num "$d1" || ! is_num "$a2" || ! is_num "$b2" || ! is_num "$c2" || ! is_num "$d2" || ! is_num "$a3" || ! is_num "$b3" || ! is_num "$c3" || ! is_num "$d3"; then echo -e "${RED}Invalid input.${NC}"; return; fi
         local det=$(awk "BEGIN { printf \"%.15g\", $a1*($b2*$c3-$b3*$c2) - $b1*($a2*$c3-$a3*$c2) + $c1*($a2*$b3-$a3*$b2) }")
         if (( $(awk "BEGIN { print ($det == 0) }") )); then
             echo -e "${RED}No unique solution (Det = 0)${NC}"
@@ -785,6 +804,19 @@ solve_ratios() {
     read -p "Value a: " a; read -p "Value b: " b
     read -p "Value c: " c; read -p "Value d: " d
     
+    # Validation: Ensure 3 numbers and 1 '?'
+    local q_count=0
+    [[ "$a" == "?" ]] && ((q_count++))
+    [[ "$b" == "?" ]] && ((q_count++))
+    [[ "$c" == "?" ]] && ((q_count++))
+    [[ "$d" == "?" ]] && ((q_count++))
+    
+    if [[ $q_count -ne 1 ]]; then echo -e "${RED}Must have exactly one '?'${NC}"; return; fi
+    
+    for v in "$a" "$b" "$c" "$d"; do
+        if [[ "$v" != "?" ]] && ! is_num "$v"; then echo -e "${RED}Invalid numeric input: $v${NC}"; return; fi
+    done
+
     local res=""
     if [[ "$a" == "?" ]]; then res=$(awk "BEGIN { printf \"%.15g\", ($b * $c) / $d }")
     elif [[ "$b" == "?" ]]; then res=$(awk "BEGIN { printf \"%.15g\", ($a * $d) / $c }")
@@ -795,7 +827,7 @@ solve_ratios() {
     if [[ -n "$res" ]]; then
         display_physics_res "Unknown" "$res" ""
     else
-        echo -e "${RED}Invalid input. Use '?' for one value.${NC}"
+        echo -e "${RED}Calculation error.${NC}"
     fi
 }
 
@@ -803,6 +835,11 @@ simplify_ratios() {
     echo -e "${CYAN}--- RATIO SIMPLIFIER (x : y : z) ---${NC}"
     read -p "Enter x, y, and z (space separated): " -a vals
     local count=${#vals[@]}
+    if [[ $count -eq 0 ]]; then echo -e "${RED}No input.${NC}"; return; fi
+
+    for v in "${vals[@]}"; do
+        if ! is_num "$v"; then echo -e "${RED}Invalid numeric input: $v${NC}"; return; fi
+    done
     
     # Normalize decimals (e.g. 0.5 1 1.5 -> 5 10 15)
     local max_d=0
@@ -866,16 +903,20 @@ show_equation_solver() {
            read -p "Type: " pt
            if [[ "$pt" == "1" ]]; then
                 read -p "a: " a; read -p "b: " b; read -p "c: " c
-                local x=$(awk "BEGIN { printf \"%.15g\", ($c - $b) / $a }")
-                echo -e "${GREEN}Solution: x = $(format_result "$x")${NC}"
+                if ! is_num "$a" || ! is_num "$b" || ! is_num "$c"; then echo -e "${RED}Invalid input.${NC}"; else
+                    local x=$(awk "BEGIN { printf \"%.15g\", ($c - $b) / $a }")
+                    echo -e "${GREEN}Solution: x = $(format_result "$x")${NC}"
+                fi
            else
                 read -p "a: " a; read -p "b: " b; read -p "c: " c
-                local d=$(awk "BEGIN { print ($b^2) - (4*$a*$c) }")
-                if (( $(awk "BEGIN { print ($d < 0) }") )); then echo -e "${RED}No real roots.${NC}"
-                else
-                    local x1=$(awk "BEGIN { printf \"%.15g\", (-$b + sqrt($d)) / (2*$a) }")
-                    local x2=$(awk "BEGIN { printf \"%.15g\", (-$b - sqrt($d)) / (2*$a) }")
-                    echo -e "${GREEN}x1 = $(format_result "$x1"), x2 = $(format_result "$x2")${NC}"
+                if ! is_num "$a" || ! is_num "$b" || ! is_num "$c"; then echo -e "${RED}Invalid input.${NC}"; else
+                    local d=$(awk "BEGIN { print ($b^2) - (4*$a*$c) }")
+                    if (( $(awk "BEGIN { print ($d < 0) }") )); then echo -e "${RED}No real roots.${NC}"
+                    else
+                        local x1=$(awk "BEGIN { printf \"%.15g\", (-$b + sqrt($d)) / (2*$a) }")
+                        local x2=$(awk "BEGIN { printf \"%.15g\", (-$b - sqrt($d)) / (2*$a) }")
+                        echo -e "${GREEN}x1 = $(format_result "$x1"), x2 = $(format_result "$x2")${NC}"
+                    fi
                 fi
            fi ;;
         S) solve_simul ;;
