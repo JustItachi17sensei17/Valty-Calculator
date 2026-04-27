@@ -58,7 +58,7 @@ shutdown() {
     sleep 0.2
     echo -ne "${RED}[▰▰▰▱▱▱▱▱▱▱] 30%${NC}\r"
     sleep 0.2
-    echo -ne "${RED}[▰▱▱▱▱▱▱▱▱▱] 10%${NC}\r"
+    echo -ne "${RED}[▱▱▱▱▱▱▱▱▱▱] 10%${NC}\r"
     sleep 0.3
     echo -e "\n\n${CYAN}  █▀▀ █▀█ █▀█ █▀▄ █▀▄ █ █ █▀▀${NC}"
     echo -e "${CYAN}  █ █ █ █ █ █ █ █ █▀▄ ▀█▀ █▀▀${NC}"
@@ -136,7 +136,11 @@ calculate() {
     fi
 
     # 1. Security: Strict input sanitization to prevent command injection
-
+    if [[ "$expr" =~ [\$\`\{\}\[\]\;\&\|\\!<>] ]]; then
+        echo -e "${RED}ERR: SECURITY VIOLATION - ILLEGAL CHARACTERS DETECTED${NC}"
+        echo -e "${YELLOW}Tip: Only use standard math symbols and functions.${NC}"
+        return 1
+    fi
 
     # 2. Expand shorthand and Unit Suffixes (Optimized: Combined SED calls)
     expr=$(echo "$expr" | sed -E \
@@ -506,14 +510,6 @@ conv_temperature() {
     local names="Celsius(C) Fahrenheit(F) Kelvin(K) Rankine(R)"
     local factors="1 0.555555555555556 1 0.555555555555556"
     local offsets="273.15 255.372222222222 0 0"
-    
-    # Boundary check for temperature
-    read -p "  Enter VALUE: " val_check
-    if ! is_num "$val_check"; then echo -e "${RED}Invalid input.${NC}"; sleep 1; show_unit_converter; return; fi
-    # We will pass this to nested_conv_engine, but since that does its own read, 
-    # we can't easily intercept it without changing the engine.
-    # For now, the engine will handle it, but I'll add a check inside nested_conv_engine.
-    
     nested_conv_engine "Temperature" "$names" "$factors" "$offsets"
     show_unit_converter
 }
@@ -699,6 +695,13 @@ solve_ch4() { # AC Circuits
             local res=$(awk "BEGIN { printf \"%.15g\", 1 / (2 * $PI_VAL * $f * $v) }")
             display_physics_res "XC" "$res" "ohm"
         fi
+    else
+        read -p "R: " r; read -p "XL: " xl; read -p "XC: " xc
+        if ! is_num "$r" || ! is_num "$xl" || ! is_num "$xc"; then echo -e "${RED}Invalid input.${NC}"; return; fi
+        local z=$(awk "BEGIN { printf \"%.15g\", sqrt($r^2 + ($xl - $xc)^2) }")
+        display_physics_res "Impedance Z" "$z" "ohm"
+        local ph=$(awk "BEGIN { printf \"%.15g\", atan2(($xl - $xc), $r) * 180 / $PI_VAL }")
+        display_physics_res "Phase Angle" "$ph" "deg"
     fi
     read -p " Solve another in CH4? (y/n): " again
     [[ "${again,,}" == "y" ]] && { solve_ch4; return; }
@@ -736,9 +739,18 @@ solve_modern() { # CH5-8
            else
                 echo -e " [1] NOT [2] AND [3] OR"; read -p "Gate: " g
                 case $g in
-                    1) read -p "Input (0/1): " a; [[ "$a" =~ ^[01]$ ]] && { [[ $a -eq 0 ]] && display_physics_res "OUT" "1" "" || display_physics_res "OUT" "0" ""; } || echo -e "${RED}0/1 only.${NC}" ;;
-                    2) read -p "A (0/1): " a; read -p "B (0/1): " b; [[ "$a" =~ ^[01]$ && "$b" =~ ^[01]$ ]] && { [[ $a -eq 1 && $b -eq 1 ]] && display_physics_res "OUT" "1" "" || display_physics_res "OUT" "0" ""; } || echo -e "${RED}0/1 only.${NC}" ;;
-                    3) read -p "A (0/1): " a; read -p "B (0/1): " b; [[ "$a" =~ ^[01]$ && "$b" =~ ^[01]$ ]] && { [[ $a -eq 1 || $b -eq 1 ]] && display_physics_res "OUT" "1" "" || display_physics_res "OUT" "0" ""; } || echo -e "${RED}0/1 only.${NC}" ;;
+                    1) read -p "Input (0/1): " a
+                       if [[ "$a" =~ ^[01]$ ]]; then
+                           [[ $a -eq 0 ]] && display_physics_res "OUT" "1" "" || display_physics_res "OUT" "0" ""
+                       else echo -e "${RED}0/1 only.${NC}"; fi ;;
+                    2) read -p "A (0/1): " a; read -p "B (0/1): " b
+                       if [[ "$a" =~ ^[01]$ && "$b" =~ ^[01]$ ]]; then
+                           [[ $a -eq 1 && $b -eq 1 ]] && display_physics_res "OUT" "1" "" || display_physics_res "OUT" "0" ""
+                       else echo -e "${RED}0/1 only.${NC}"; fi ;;
+                    3) read -p "A (0/1): " a; read -p "B (0/1): " b
+                       if [[ "$a" =~ ^[01]$ && "$b" =~ ^[01]$ ]]; then
+                           [[ $a -eq 1 || $b -eq 1 ]] && display_physics_res "OUT" "1" "" || display_physics_res "OUT" "0" ""
+                       else echo -e "${RED}0/1 only.${NC}"; fi ;;
                 esac
            fi ;;
         *) echo -e "${WHITE}LASER Properties: Coherence, Collimation, Monochromaticity, High Intensity.${NC}" ;;
@@ -952,7 +964,6 @@ show_history() {
     esac
 }
 
-# --- Manual System ---
 # --- Enhanced Manual System ---
 show_manual() {
     echo -e "${YELLOW}┌──────────────────────────────────────────┐${NC}"
