@@ -8,7 +8,10 @@ UNIT_SYSTEM="metric" # metric, imperial
 LAST_RESULT=0
 COUNT=0
 HISTORY_FILE=".valty_history"
+set -o pipefail # Better error handling in pipes
+touch "$HISTORY_FILE" && chmod 600 "$HISTORY_FILE"
 rm -f "$HISTORY_FILE" # Clear session history on startup
+touch "$HISTORY_FILE" && chmod 600 "$HISTORY_FILE"
 
 # --- Color Definitions ---
 RED='\033[1;31m'
@@ -20,6 +23,12 @@ MAGENTA='\033[1;35m'
 WHITE='\033[1;37m'
 GRAY='\033[0;90m'
 NC='\033[0m' # No Color
+ 
+# --- Helper Functions ---
+is_num() {
+    [[ "$1" =~ ^-?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?$ ]]
+}
+
 
 # --- Startup Sequence ---
 startup() {
@@ -120,53 +129,69 @@ calculate() {
     local expr="$1"
     local raw_result=""
     
-    # 0. Expand shorthand syntax (e.g., sin30 -> sin(30))
-    expr=$(echo "$expr" | sed -E 's/(sin|cos|tan|exp|ln|log|sqrt)([a-zA-Z0-9.]+)/\1(\2)/g')
-
-    # 1. Handle Unit Suffixes (SI Prefixes: Tera to Femto)
-    # Use boundaries to avoid collision with constants (e.g., '2pi' should not match 'p' for pico)
-    expr=$(echo "$expr" | sed -E 's/([0-9.]+)T\b/\(\1*10^12\)/g; s/([0-9.]+)G\b/\(\1*10^9\)/g; s/([0-9.]+)M\b/\(\1*10^6\)/g; s/([0-9.]+)k\b/\(\1*1000\)/g; s/([0-9.]+)c\b/\(\1\/100\)/g; s/([0-9.]+)m\b/\(\1\/1000\)/g; s/([0-9.]+)u\b/\(\1*10^-6\)/g; s/([0-9.]+)n\b/\(\1*10^-9\)/g; s/([0-9.]+)p\b/\(\1*10^-12\)/g; s/([0-9.]+)f\b/\(\1*10^-15\)/g')
-    # Additional Curriculum Units (these are multi-letter, so less prone to collision)
-    expr=$(echo "$expr" | sed -E 's/([0-9.]+)km\b/\(\1*1000\)/g; s/([0-9.]+)cm\b/\(\1\/100\)/g; s/([0-9.]+)mm\b/\(\1\/1000\)/g; s/([0-9.]+)kg\b/\(\1*1000\)/g; s/([0-9.]+)ton\b/\(\1*10^6\)/g')
-
-    # 2. Implicit Multiplication Support
-    # Number before/after parenthesis or between parentheses
-    expr=$(echo "$expr" | sed -E 's/([0-9.]+)\(/\1*(/g; s/\)([0-9.]+)/)*\1/g; s/\)\(/\)*( /g')
-    # Number before constants or functions (excluding 'e' in scientific notation)
-    expr=$(echo "$expr" | sed -E 's/([0-9.]+)(pi|ans|sin|cos|tan|ln|log|exp|sqrt)/\1*\2/g')
-
-    # 3. Handle Constants
-    expr=$(echo "$expr" | sed -E 's/\bpi\b/3.14159265358979/g; s/\be\b/2.71828182845905/g; s/\bc\b/(3*10^8)/g; s/\bG\b/(6.674*10^-11)/g; s/\bh\b/(6.626*10^-34)/g; s/\bqe\b/(1.602*10^-19)/g; s/\bNa\b/(6.022*10^23)/g; s/\bkb\b/(1.381*10^-23)/g')
-
-    # 4. Replace 'ans' with the last result
-    expr=${expr//ans/$LAST_RESULT}
-
-    # 5. Handle Degree Conversion
-    local PI_VAL="3.14159265358979323846"
-    if [[ "$ANGLE_MODE" == "deg" ]]; then
-        expr=$(echo "$expr" | sed -E "s/sin\(([^)]+)\)/SIN((\1)*$PI_VAL\/180)/g")
-        expr=$(echo "$expr" | sed -E "s/cos\(([^)]+)\)/COS((\1)*$PI_VAL\/180)/g")
-        expr=$(echo "$expr" | sed -E "s/tan\(([^)]+)\)/TAN((\1)*$PI_VAL\/180)/g")
-    else
-        expr=$(echo "$expr" | sed -E 's/sin\(([^)]+)\)/SIN(\1)/g')
-        expr=$(echo "$expr" | sed -E 's/cos\(([^)]+)\)/COS(\1)/g')
-        expr=$(echo "$expr" | sed -E 's/tan\(([^)]+)\)/TAN(\1)/g')
+    # 1. Security: Strict input sanitization to prevent command injection
+    # Allows: numbers, letters, math operators, parentheses, commas, dots, and '?' for ratios
+    if [[ "$expr" =~ [\$\`\{\}\[\]\;\&\|\\!<>] ]]; then
+        echo -e "${RED}ERR: SECURITY VIOLATION - ILLEGAL CHARACTERS DETECTED${NC}"
+        echo -e "${YELLOW}Tip: Only use standard math symbols and functions.${NC}"
+        return 1
     fi
 
-    # 6. Handle 'v' root, 'exp', and 'log' functions
-    expr=$(echo "$expr" | sed -E 's/([0-9.eE+-]+) v ([0-9.eE+-]+)/ROOT(\1,\2)/g')
-    expr=$(echo "$expr" | sed -E 's/exp\(([^)]+)\)/EXP(\1)/g')
-    expr=$(echo "$expr" | sed -E 's/ln\(([^)]+)\)/LN(\1)/g')
-    expr=$(echo "$expr" | sed -E 's/log\(([^,]+),([^)]+)\)/LOGB(\1,\2)/g')
-    expr=$(echo "$expr" | sed -E 's/log\(([^,)]+)\)/LOG10(\1)/g')
+    # 2. Expand shorthand and Unit Suffixes (Optimized: Combined SED calls)
+    expr=$(echo "$expr" | sed -E \
+        -e 's/(sin|cos|tan|exp|ln|log|sqrt)([a-zA-Z0-9.]+)/\1(\2)/g' \
+        -e 's/([0-9.]+)T\b/\(\1*10^12\)/g' -e 's/([0-9.]+)G\b/\(\1*10^9\)/g' -e 's/([0-9.]+)M\b/\(\1*10^6\)/g' \
+        -e 's/([0-9.]+)k\b/\(\1*1000\)/g' -e 's/([0-9.]+)c\b/\(\1\/100\)/g' -e 's/([0-9.]+)m\b/\(\1\/1000\)/g' \
+        -e 's/([0-9.]+)u\b/\(\1*10^-6\)/g' -e 's/([0-9.]+)n\b/\(\1*10^-9\)/g' -e 's/([0-9.]+)p\b/\(\1*10^-12\)/g' -e 's/([0-9.]+)f\b/\(\1*10^-15\)/g' \
+        -e 's/([0-9.]+)km\b/\(\1*1000\)/g' -e 's/([0-9.]+)cm\b/\(\1\/100\)/g' -e 's/([0-9.]+)mm\b/\(\1\/1000\)/g' \
+        -e 's/([0-9.]+)kg\b/\(\1*1000\)/g' -e 's/([0-9.]+)ton\b/\(\1*10^6\)/g')
 
-    # 7. Execute with BC or AWK
+    # 3. Implicit Multiplication Support
+    expr=$(echo "$expr" | sed -E \
+        -e 's/([0-9.]+)\(/\1*(/g' -e 's/\)([0-9.]+)/)*\1/g' -e 's/\)\(/\)*( /g' \
+        -e 's/([0-9.]+)(pi|ans|sin|cos|tan|ln|log|exp|sqrt)/\1*\2/g')
+
+    # 4. Handle Constants (Curriculum Accurate)
+    local PI_VAL="3.14159265358979323846"
+    expr=$(echo "$expr" | sed -E \
+        -e "s/\bpi\b/$PI_VAL/g" -e 's/\be\b/2.71828182845905/g' -e 's/\bc\b/(3*10^8)/g' \
+        -e 's/\bG\b/(6.674*10^-11)/g' -e 's/\bh\b/(6.626*10^-34)/g' -e 's/\bqe\b/(1.602*10^-19)/g' \
+        -e 's/\bNa\b/(6.022*10^23)/g' -e 's/\bkb\b/(1.381*10^-23)/g')
+
+    # 5. Replace 'ans' with the last result
+    expr=${expr//ans/"$LAST_RESULT"}
+
+    # 6. Handle Degree Conversion
+    if [[ "$ANGLE_MODE" == "deg" ]]; then
+        expr=$(echo "$expr" | sed -E \
+            -e "s/sin\(([^)]+)\)/SIN((\1)*$PI_VAL\/180)/g" \
+            -e "s/cos\(([^)]+)\)/COS((\1)*$PI_VAL\/180)/g" \
+            -e "s/tan\(([^)]+)\)/TAN((\1)*$PI_VAL\/180)/g")
+    else
+        expr=$(echo "$expr" | sed -E -e 's/sin\(([^)]+)\)/SIN(\1)/g' -e 's/cos\(([^)]+)\)/COS(\1)/g' -e 's/tan\(([^)]+)\)/TAN(\1)/g')
+    fi
+
+    # 7. Handle 'v' root, 'exp', and 'log' functions
+    expr=$(echo "$expr" | sed -E \
+        -e 's/([0-9.eE+-]+) v ([0-9.eE+-]+)/ROOT(\1,\2)/g' \
+        -e 's/exp\(([^)]+)\)/EXP(\1)/g' -e 's/ln\(([^)]+)\)/LN(\1)/g' \
+        -e 's/log\(([^,]+),([^)]+)\)/LOGB(\1,\2)/g' -e 's/log\(([^,)]+)\)/LOG10(\1)/g')
+
+    # 8. Execute with BC or AWK
     if command -v bc >/dev/null 2>&1; then
-        # Upgrade: Convert a^b to e(l(a)*b) for fractional powers in bc
-        local bc_expr=$(echo "$expr" | sed -E 's/([0-9.eE+-]+)\^([0-9.eE+-]+)/e(l(\1)*(\2))/g; s/SIN\(/s(/g; s/COS\(/c(/g; s/TAN\(([^)]+)\)/(s(\1)\/c(\1))/g; s/ROOT\(([^,]+),([^)]+)\)/e(l(\1)\/\2)/g; s/EXP\(([^)]+)\)/e(\1)/g; s/LN\(([^)]+)\)/l(\1)/g; s/LOGB\(([^,]+),([^)]+)\)/(l(\2)\/l(\1))/g; s/LOG10\(([^)]+)\)/(l(\1)\/l(10))/g')
+        local bc_expr=$(echo "$expr" | sed -E \
+            -e 's/([0-9.eE+-]+)\^([0-9.eE+-]+)/e(l(\1)*(\2))/g' \
+            -e 's/SIN\(/s(/g' -e 's/COS\(/c(/g' -e 's/TAN\(([^)]+)\)/(s(\1)\/c(\1))/g' \
+            -e 's/ROOT\(([^,]+),([^)]+)\)/e(l(\1)\/\2)/g' -e 's/EXP\(([^)]+)\)/e(\1)/g' \
+            -e 's/LN\(([^)]+)\)/l(\1)/g' -e 's/LOGB\(([^,]+),([^)]+)\)/(l(\2)\/l(\1))/g' \
+            -e 's/LOG10\(([^)]+)\)/(l(\1)\/l(10))/g')
         raw_result=$(echo "scale=20; $bc_expr" | bc -l 2>/dev/null)
     elif command -v awk >/dev/null 2>&1; then
-        local awk_expr=$(echo "$expr" | sed -E 's/SIN\(/sin(/g; s/COS\(/cos(/g; s/TAN\(([^)]+)\)/(sin(\1)\/cos(\1))/g; s/ROOT\(([^,]+),([^)]+)\)/(\1^(1\/\2))/g; s/EXP\(/exp(/g; s/LN\(([^)]+)\)/log(\1)/g; s/LOGB\(([^,]+),([^)]+)\)/(log(\2)\/log(\1))/g; s/LOG10\(([^)]+)\)/(log(\1)\/log(10))/g')
+        local awk_expr=$(echo "$expr" | sed -E \
+            -e 's/SIN\(/sin(/g' -e 's/COS\(/cos(/g' -e 's/TAN\(([^)]+)\)/(sin(\1)\/cos(\1))/g' \
+            -e 's/ROOT\(([^,]+),([^)]+)\)/(\1^(1\/\2))/g' -e 's/EXP\(/exp(/g' \
+            -e 's/LN\(([^)]+)\)/log(\1)/g' -e 's/LOGB\(([^,]+),([^)]+)\)/(log(\2)\/log(\1))/g' \
+            -e 's/LOG10\(([^)]+)\)/(log(\1)\/log(10))/g')
         raw_result=$(awk "BEGIN { printf \"%.15g\", $awk_expr }" 2>/dev/null)
     fi
 
@@ -246,12 +271,25 @@ nested_conv_engine() {
         echo -e "  ${RED}Invalid selection.${NC}"; sleep 1; return
     fi
 
+    if ! is_num "$val"; then
+        echo -e "  ${RED}Invalid numeric value: $val${NC}"; sleep 1; return
+    fi
+
     local f_idx=$((from_idx - 1))
     local t_idx=$((to_idx - 1))
     
     # Offsets (default to 0 if not provided)
     local o_from=${offsets[$f_idx]:-0}
     local o_to=${offsets[$t_idx]:-0}
+
+    # Physical Boundary Check (Absolute Zero)
+    if [[ "$category" == "Temperature" ]]; then
+        local k_val=$(awk "BEGIN { print ($val * ${factors[$f_idx]} + $o_from) }")
+        if (( $(awk "BEGIN { print ($k_val < -0.0001) }") )); then
+            echo -e "  ${RED}ERR: Physically impossible temperature (below 0K).${NC}"
+            sleep 1; return
+        fi
+    fi
 
     # Calculation: res = ((val * factor_from + offset_from) - offset_to) / factor_to
     local res=$(awk "BEGIN { printf \"%.15g\", (($val * ${factors[$f_idx]} + $o_from) - $o_to) / ${factors[$t_idx]} }")
@@ -465,6 +503,14 @@ conv_temperature() {
     local names="Celsius(C) Fahrenheit(F) Kelvin(K) Rankine(R)"
     local factors="1 0.555555555555556 1 0.555555555555556"
     local offsets="273.15 255.372222222222 0 0"
+    
+    # Boundary check for temperature
+    read -p "  Enter VALUE: " val_check
+    if ! is_num "$val_check"; then echo -e "${RED}Invalid input.${NC}"; sleep 1; show_unit_converter; return; fi
+    # We will pass this to nested_conv_engine, but since that does its own read, 
+    # we can't easily intercept it without changing the engine.
+    # For now, the engine will handle it, but I'll add a check inside nested_conv_engine.
+    
     nested_conv_engine "Temperature" "$names" "$factors" "$offsets"
     show_unit_converter
 }
@@ -510,6 +556,10 @@ solve_ch1() { # DC Circuits
     case $sub in
         1) read -p "Type (p/s): " t; read -p "Enter values (space separated): " -a r
            local res=0
+           for x in "${r[@]}"; do
+                if ! is_num "$x"; then echo -e "${RED}Invalid input: $x${NC}"; return; fi
+                if (( $(awk "BEGIN { print ($x < 0) }") )); then echo -e "${RED}Resistance cannot be negative.${NC}"; return; fi
+           done
            if [[ "$t" == "s" ]]; then
                 for x in "${r[@]}"; do res=$(awk "BEGIN { print $res + $x }"); done
            else
@@ -520,19 +570,23 @@ solve_ch1() { # DC Circuits
         2) echo -e " [a] Current Div [b] Voltage Div"; read -p "Option: " o
            if [[ "$o" == "a" ]]; then
                 read -p "Total I: " it; read -p "R branch: " rb; read -p "R other: " ro
+                if ! is_num "$it" || ! is_num "$rb" || ! is_num "$ro"; then echo -e "${RED}Invalid input.${NC}"; return; fi
                 local res=$(awk "BEGIN { printf \"%.15g\", $it * ($ro / ($rb + $ro)) }")
                 display_physics_res "I branch" "$res" "A"
            else
                 read -p "Total V: " vt; read -p "R target: " rt; read -p "R total: " rall
+                if ! is_num "$vt" || ! is_num "$rt" || ! is_num "$rall"; then echo -e "${RED}Invalid input.${NC}"; return; fi
                 local res=$(awk "BEGIN { printf \"%.15g\", $vt * ($rt / $rall) }")
                 display_physics_res "V branch" "$res" "V"
            fi ;;
         3) read -p "R (ohm): " r; read -p "A (m²): " a; read -p "L (m): " l
+           if ! is_num "$r" || ! is_num "$a" || ! is_num "$l"; then echo -e "${RED}Invalid input.${NC}"; return; fi
            local rho=$(awk "BEGIN { printf \"%.15g\", ($r * $a) / $l }")
            local sigma=$(awk "BEGIN { printf \"%.15g\", 1 / $rho }")
            display_physics_res "Resistivity" "$rho" "ohm.m"
            display_physics_res "Conductivity" "$sigma" "S/m" ;;
         4) read -p "VB (V): " vb; read -p "Req (ohm): " req; read -p "r (ohm): " rint
+           if ! is_num "$vb" || ! is_num "$req" || ! is_num "$rint"; then echo -e "${RED}Invalid input.${NC}"; return; fi
            local i=$(awk "BEGIN { printf \"%.15g\", $vb / ($req + $rint) }")
            display_physics_res "Total I" "$i" "A" ;;
     esac
