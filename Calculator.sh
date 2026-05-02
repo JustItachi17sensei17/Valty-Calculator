@@ -136,24 +136,28 @@ calculate() {
     fi
 
     # 1. Security: Strict input sanitization to prevent command injection
-    if [[ "$expr" =~ [\$\`\{\}\[\]\;\&\|\\!<>] ]]; then
-        echo -e "${RED}ERR: SECURITY VIOLATION - ILLEGAL CHARACTERS DETECTED${NC}"
-        echo -e "${YELLOW}Tip: Only use standard math symbols and functions.${NC}"
-        return 1
-    fi
+forbidden_pattern='[\$`{}\[\];&\\!<> ]'
+if [[ "$expr" =~ $forbidden_pattern ]]; then
+    echo -e "${RED}ERR: SECURITY VIOLATION - ILLEGAL CHARACTERS DETECTED${NC}"
+    echo -e "${YELLOW}Tip: Only use standard math symbols and functions.${NC}"
+    return 1
+fi
 
-    # 2. Expand shorthand and Unit Suffixes (Optimized: Combined SED calls)
+    # 2. Expand shorthand and Unit Suffixes
+    # IMPORTANT: Multi-char suffixes (km, cm, mm, kg) must be listed BEFORE
+    # single-char ones (k, c, m) so that sed matches the longer token first.
     expr=$(echo "$expr" | sed -E \
         -e 's/(sin|cos|tan|exp|ln|log|sqrt)([a-zA-Z0-9.]+)/\1(\2)/g' \
+        -e 's/([0-9.]+)km\b/\(\1*1000\)/g' -e 's/([0-9.]+)cm\b/\(\1\/100\)/g' -e 's/([0-9.]+)mm\b/\(\1\/1000\)/g' \
+        -e 's/([0-9.]+)kg\b/\(\1*1000\)/g' -e 's/([0-9.]+)ton\b/\(\1*10^6\)/g' \
         -e 's/([0-9.]+)T\b/\(\1*10^12\)/g' -e 's/([0-9.]+)G\b/\(\1*10^9\)/g' -e 's/([0-9.]+)M\b/\(\1*10^6\)/g' \
         -e 's/([0-9.]+)k\b/\(\1*1000\)/g' -e 's/([0-9.]+)c\b/\(\1\/100\)/g' -e 's/([0-9.]+)m\b/\(\1\/1000\)/g' \
-        -e 's/([0-9.]+)u\b/\(\1*10^-6\)/g' -e 's/([0-9.]+)n\b/\(\1*10^-9\)/g' -e 's/([0-9.]+)p\b/\(\1*10^-12\)/g' -e 's/([0-9.]+)f\b/\(\1*10^-15\)/g' \
-        -e 's/([0-9.]+)km\b/\(\1*1000\)/g' -e 's/([0-9.]+)cm\b/\(\1\/100\)/g' -e 's/([0-9.]+)mm\b/\(\1\/1000\)/g' \
-        -e 's/([0-9.]+)kg\b/\(\1*1000\)/g' -e 's/([0-9.]+)ton\b/\(\1*10^6\)/g')
+        -e 's/([0-9.]+)u\b/\(\1*10^-6\)/g' -e 's/([0-9.]+)n\b/\(\1*10^-9\)/g' -e 's/([0-9.]+)p\b/\(\1*10^-12\)/g' -e 's/([0-9.]+)f\b/\(\1*10^-15\)/g')
 
     # 3. Implicit Multiplication Support
+    # Fix: closing-opening paren must produce )*(  not )*( with a space
     expr=$(echo "$expr" | sed -E \
-        -e 's/([0-9.]+)\(/\1*(/g' -e 's/\)([0-9.]+)/)*\1/g' -e 's/\)\(/\)*( /g' \
+        -e 's/([0-9.]+)\(/\1*(/g' -e 's/\)([0-9.]+)/)*\1/g' -e 's/\)\(/)*(/g' \
         -e 's/([0-9.]+)(pi|ans|sin|cos|tan|ln|log|exp|sqrt)/\1*\2/g')
 
     # 4. Handle Constants (Curriculum Accurate)
@@ -169,12 +173,18 @@ calculate() {
     # 6. Handle Degree Conversion
     if [[ "$ANGLE_MODE" == "deg" ]]; then
         # Domain Check: tan(90), tan(270), etc.
-        if [[ "$expr" =~ tan\(([^)]+)\) ]]; then
-            local angle=$(echo "${BASH_REMATCH[1]}" | bc -l 2>/dev/null || awk "BEGIN { print ${BASH_REMATCH[1]} }")
+        # Use awk for the modulo check (not $(()) which cannot handle floats).
+        # حط الـ Regex في متغير لوحده
+    tan_regex='tan\(\(\([^)]+\)\)\)'
+
+# استخدم المتغير جوه الـ if من غير quotes
+        if [[ "$expr" =~ $tan_regex ]]; then
+            angle=$(awk "BEGIN { print ${BASH_REMATCH[1]} }" 2>/dev/null)
             if is_num "$angle"; then
-                local check=$(awk "BEGIN { print (($angle - 90) % 180 == 0) }")
+                local check
+                check=$(awk "BEGIN { diff = ($angle - 90) % 180; print (diff < 0.0001 && diff > -0.0001) ? 1 : 0 }")
                 if [[ "$check" == "1" ]]; then
-                    echo -e "${RED}ERR: TAN UNDEFINED AT $((angle))°${NC}"
+                    echo -e "${RED}ERR: TAN UNDEFINED AT ${angle}°${NC}"
                     return 1
                 fi
             fi
@@ -187,16 +197,16 @@ calculate() {
         expr=$(echo "$expr" | sed -E -e 's/sin\(([^)]+)\)/SIN(\1)/g' -e 's/cos\(([^)]+)\)/COS(\1)/g' -e 's/tan\(([^)]+)\)/TAN(\1)/g')
     fi
 
-    # 7. Domain Validation (Log/Ln/Sqrt)
-    if [[ "$expr" =~ (ln|log|sqrt)\(([^)]+)\) ]]; then
+    # 7. Domain Validation for Log/Ln (checked on the original user input before sed transforms it)
+    # We match the original $1 argument so the pattern still contains ln/log/sqrt keywords.
+    if [[ "$1" =~ (ln|sqrt)\((-?[0-9.eE+]+)\) ]]; then
         local func="${BASH_REMATCH[1]}"
-        local val_expr="${BASH_REMATCH[2]}"
-        local val=$(echo "$val_expr" | bc -l 2>/dev/null || awk "BEGIN { print $val_expr }")
-        if is_num "$val"; then
-            if [[ "$func" =~ ^l && $(awk "BEGIN { print ($val <= 0) }") == "1" ]]; then
-                echo -e "${RED}ERR: $func UNDEFINED FOR $val${NC}"
+        local raw_v="${BASH_REMATCH[2]}"
+        if is_num "$raw_v"; then
+            if [[ "$func" == "ln" ]] && (( $(awk "BEGIN { print ($raw_v <= 0) }") )); then
+                echo -e "${RED}ERR: ln UNDEFINED FOR VALUES <= 0${NC}"
                 return 1
-            elif [[ "$func" == "sqrt" && $(awk "BEGIN { print ($val < 0) }") == "1" ]]; then
+            elif [[ "$func" == "sqrt" ]] && (( $(awk "BEGIN { print ($raw_v < 0) }") )); then
                 echo -e "${RED}ERR: SQRT OF NEGATIVE NUMBER${NC}"
                 return 1
             fi
@@ -209,7 +219,7 @@ calculate() {
         -e 's/exp\(([^)]+)\)/EXP(\1)/g' -e 's/ln\(([^)]+)\)/LN(\1)/g' \
         -e 's/log\(([^,]+),([^)]+)\)/LOGB(\1,\2)/g' -e 's/log\(([^,)]+)\)/LOG10(\1)/g')
 
-    # 8. Execute with BC or AWK
+    # 9. Execute with BC or AWK
     if command -v bc >/dev/null 2>&1; then
         local bc_expr=$(echo "$expr" | sed -E \
             -e 's/([0-9.eE+-]+)\^([0-9.eE+-]+)/e(l(\1)*(\2))/g' \
@@ -630,7 +640,7 @@ solve_ch2() { # Magnetism
     case $sub in
         1) read -p "B (T): " b; read -p "A (m²): " a; read -p "θ (deg): " th
            if ! is_num "$b" || ! is_num "$a" || ! is_num "$th"; then echo -e "${RED}Invalid input.${NC}"; return; fi
-           local flux=$(awk "BEGIN { printf \"%.15g\", $b * $a * sin($th * $PI_VAL / 180) }")
+           local flux=$(awk "BEGIN { printf \"%.15g\", $b * $a * sin($th * 3.14159265358979323846 / 180) }")
            display_physics_res "Flux" "$flux" "Wb" ;;
         2) echo -e " [a] Straight [b] Circular [c] Spiral"; read -p "Opt: " o
            read -p "I (A): " i
@@ -648,7 +658,7 @@ solve_ch2() { # Magnetism
            display_physics_res "B Density" "$res" "T" ;;
         3) read -p "B (T): " b; read -p "I (A): " i; read -p "L (m): " l; read -p "θ (deg): " th
            if ! is_num "$b" || ! is_num "$i" || ! is_num "$l" || ! is_num "$th"; then echo -e "${RED}Invalid input.${NC}"; return; fi
-           local f=$(awk "BEGIN { printf \"%.15g\", $b * $i * $l * sin($th * $PI_VAL / 180) }")
+           local f=$(awk "BEGIN { printf \"%.15g\", $b * $i * $l * sin($th * 3.14159265358979323846 / 180) }")
            display_physics_res "Force" "$f" "N" ;;
         4) echo -e " [a] Ammeter (Rs) [b] Voltmeter (Rm) [c] Ohmeter"; read -p "Opt: " o
            if [[ "$o" == "a" ]]; then
@@ -962,7 +972,7 @@ show_equation_solver() {
         R) 
            echo -e " [1] Proportional Solver (a/b = c/d) [2] Ratio Simplifier"
            read -p "Select: " rt
-           [[ "$rt" == "1" ]] && solve_ratios || simplify_ratios ;;
+           if [[ "$rt" == "1" ]]; then solve_ratios; else simplify_ratios; fi ;;
         *) echo -e "${RED}Invalid option.${NC}" ;;
     esac
     read -p "Press any key to continue..." -n1 -s
