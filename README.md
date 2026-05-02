@@ -9,6 +9,9 @@
 
 Valty OS is not just a calculator; it's a high-performance terminal-based operating environment designed for high school and college science students. It combines a robust mathematical engine with a deep understanding of physics, chemistry, and engineering units.
 
+<img width="461" height="245" alt="image" src="https://github.com/user-attachments/assets/33c87252-e5fc-43a1-b7d4-42f507e15031" />
+
+
 ## ✨ Key Features
 
 ### 🧮 Advanced Mathematical Engine
