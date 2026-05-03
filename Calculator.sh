@@ -1170,6 +1170,238 @@ show_manual() {
     show_manual
 }
 
+# --- Chemistry Data & Helpers ---
+
+# Atomic Masses (Approximate average atomic masses)
+declare -A ATOMIC_MASSES=(
+    ["H"]=1.008 ["He"]=4.0026 ["Li"]=6.94 ["Be"]=9.0122 ["B"]=10.81 ["C"]=12.011 ["N"]=14.007 ["O"]=15.999 ["F"]=18.998 ["Ne"]=20.180
+    ["Na"]=22.990 ["Mg"]=24.305 ["Al"]=26.982 ["Si"]=28.085 ["P"]=30.974 ["S"]=32.06 ["Cl"]=35.45 ["Ar"]=39.948
+    ["K"]=39.098 ["Ca"]=40.078 ["Sc"]=44.956 ["Ti"]=47.867 ["V"]=50.942 ["Cr"]=51.996 ["Mn"]=54.938 ["Fe"]=55.845 ["Co"]=58.933 ["Ni"]=58.693 ["Cu"]=63.546 ["Zn"]=65.38 ["Ga"]=69.723 ["Ge"]=72.630 ["As"]=74.922 ["Se"]=78.971 ["Br"]=79.904 ["Kr"]=83.798
+    ["Rb"]=85.468 ["Sr"]=87.62 ["Y"]=88.906 ["Zr"]=91.224 ["Nb"]=92.906 ["Mo"]=95.95 ["Tc"]=98 ["Ru"]=101.07 ["Rh"]=102.91 ["Pd"]=106.42 ["Ag"]=107.87 ["Cd"]=112.41 ["In"]=114.82 ["Sn"]=118.71 ["Sb"]=121.76 ["Te"]=127.60 ["I"]=126.90 ["Xe"]=131.29
+    ["Cs"]=132.91 ["Ba"]=137.33 ["La"]=138.91 ["Ce"]=140.12 ["Pr"]=140.91 ["Nd"]=144.24 ["Pm"]=145 ["Sm"]=150.36 ["Eu"]=151.96 ["Gd"]=157.25 ["Tb"]=158.93 ["Dy"]=162.50 ["Ho"]=164.93 ["Er"]=167.26 ["Tm"]=168.93 ["Yb"]=173.05 ["Lu"]=174.97
+    ["Hf"]=178.49 ["Ta"]=180.95 ["W"]=183.84 ["Re"]=186.21 ["Os"]=190.23 ["Ir"]=192.22 ["Pt"]=195.08 ["Au"]=196.97 ["Hg"]=200.59 ["Tl"]=204.38 ["Pb"]=207.2 ["Bi"]=208.98 ["Po"]=209 ["At"]=210 ["Rn"]=222
+    ["Fr"]=223 ["Ra"]=226 ["Ac"]=227 ["Th"]=232.04 ["Pa"]=231.04 ["U"]=238.03 ["Np"]=237 ["Pu"]=244 ["Am"]=243 ["Cm"]=247 ["Bk"]=247 ["Cf"]=251 ["Es"]=252 ["Fm"]=257 ["Md"]=258 ["No"]=259 ["Lr"]=262
+    ["Rf"]=267 ["Db"]=268 ["Sg"]=271 ["Bh"]=272 ["Hs"]=270 ["Mt"]=276 ["Ds"]=281 ["Rg"]=280 ["Cn"]=285 ["Nh"]=284 ["Fl"]=289 ["Mc"]=288 ["Lv"]=293 ["Ts"]=294 ["Og"]=294
+)
+
+# Function to parse chemical formula and calculate molar mass
+calculate_molar_mass() {
+    local formula="$1"
+    local total_mass=0
+    local current_element=""
+    local current_count=""
+    local len=${#formula}
+    local i=0
+    
+    while [ $i -lt $len ]; do
+        char="${formula:$i:1}"
+        
+        if [[ "$char" =~ [A-Z] ]]; then
+            if [ -n "$current_element" ]; then
+                local count=${current_count:-1}
+                local mass=${ATOMIC_MASSES[$current_element]}
+                if [ -z "$mass" ]; then
+                    echo "Error: Unknown element '$current_element'" >&2
+                    return 1
+                fi
+                total_mass=$(echo "$total_mass + ($mass * $count)" | bc -l)
+                current_element=""
+                current_count=""
+            fi
+            current_element="$char"
+        elif [[ "$char" =~ [a-z] ]]; then
+            current_element+="$char"
+        elif [[ "$char" =~ [0-9] ]]; then
+            current_count+="$char"
+        fi
+        ((i++))
+    done
+    
+    if [ -n "$current_element" ]; then
+        local count=${current_count:-1}
+        local mass=${ATOMIC_MASSES[$current_element]}
+        if [ -z "$mass" ]; then
+            echo "Error: Unknown element '$current_element'" >&2
+            return 1
+        fi
+        total_mass=$(echo "$total_mass + ($mass * $count)" | bc -l)
+    fi
+    
+    printf "%.4f" "$total_mass"
+}
+
+chemistry_solver() {
+    while true; do
+        clear
+        echo -e "${GREEN}=========================================="
+        echo "       CHEMISTRY SOLVER SUITE"
+        echo -e "==========================================${NC}"
+        echo "[1] Molar Mass Calculator"
+        echo "[2] Stoichiometry (Mole/Mass)"
+        echo "[3] Ideal Gas Law (PV=nRT)"
+        echo "[4] pH / pOH Calculator"
+        echo "[5] Dilution Calculator (C1V1=C2V2)"
+        echo "[6] Half-Life / Decay"
+        echo "[0] Back to Settings"
+        echo "------------------------------------------"
+        read -p "Select Option: " chem_choice
+
+        case $chem_choice in
+            1)
+                clear
+                echo "--- Molar Mass Calculator ---"
+                echo "Enter chemical formula (e.g., H2O, CO2, NaCl):"
+                read -p "Formula: " formula
+                formula=$(echo "$formula" | sed 's/ //g')
+                mass=$(calculate_molar_mass "$formula")
+                if [ $? -eq 0 ]; then
+                    echo "Molar Mass of $formula is: $mass g/mol"
+                else
+                    echo "Calculation failed."
+                fi
+                read -p "Press Enter to continue..."
+                ;;
+            2)
+                clear
+                echo "--- Stoichiometry ---"
+                read -p "Enter Mass of A (g): " mass_a
+                read -p "Enter Molar Mass of A (g/mol): " mm_a
+                read -p "Coefficient of A: " coef_a
+                read -p "Coefficient of B: " coef_b
+                read -p "Molar Mass of B (0 for moles only): " mm_b
+                if [ "$mm_a" == "0" ] || [ "$coef_a" == "0" ]; then
+                    echo "Error: Zero values not allowed."
+                    read -p "Press Enter..."
+                    continue
+                fi
+                moles_a=$(echo "$mass_a / $mm_a" | bc -l)
+                moles_b=$(echo "$moles_a * ($coef_b / $coef_a)" | bc -l)
+                if [ "$mm_b" != "0" ]; then
+                    mass_b=$(echo "$moles_b * $mm_b" | bc -l)
+                    printf "Result: %.4f moles, %.4f g of B\n" "$moles_b" "$mass_b"
+                else
+                    printf "Result: %.4f moles of B\n" "$moles_b"
+                fi
+                read -p "Press Enter to continue..."
+                ;;
+            3)
+                clear
+                echo "--- Ideal Gas Law (PV = nRT) ---"
+                echo "1) Pressure  2) Volume  3) Moles  4) Temperature"
+                read -p "Choice: " gas_choice
+                read -p "R (default 0.0821): " R_val; R_val=${R_val:-0.0821}
+                case $gas_choice in
+                    1) read -p "n, T(K), V(L): " n T V; res=$(echo "($n*$R_val*$T)/$V" | bc -l); echo "P = $res atm" ;;
+                    2) read -p "n, T(K), P(atm): " n T P; res=$(echo "($n*$R_val*$T)/$P" | bc -l); echo "V = $res L" ;;
+                    3) read -p "P(atm), V(L), T(K): " P V T; res=$(echo "($P*$V)/($R_val*$T)" | bc -l); echo "n = $res mol" ;;
+                    4) read -p "P(atm), V(L), n: " P V n; res=$(echo "($P*$V)/($n*$R_val)" | bc -l); echo "T = $res K" ;;
+                esac
+                read -p "Press Enter to continue..."
+                ;;
+            4)
+                clear
+                echo "--- pH / pOH Calculator ---"
+                echo "1) pH from [H+]  2) [H+] from pH  3) pOH from [OH-]  4) pH from pOH"
+                read -p "Choice: " ph_choice
+                case $ph_choice in
+                    1) read -p "[H+]: " c; res=$(echo "scale=4; -l($c)/l(10)" | bc -l); echo "pH = $res" ;;
+                    2) read -p "pH: " p; res=$(echo "scale=4; 10^(-$p)" | bc -l); echo "[H+] = $res M" ;;
+                    3) read -p "[OH-]: " c; res=$(echo "scale=4; -l($c)/l(10)" | bc -l); echo "pOH = $res" ;;
+                    4) read -p "pOH: " p; res=$(echo "scale=4; 14-$p" | bc -l); echo "pH = $res" ;;
+                esac
+                read -p "Press Enter to continue..."
+                ;;
+            5)
+                clear
+                echo "--- Dilution (C1V1=C2V2) ---"
+                echo "Leave unknown blank"
+                read -p "C1: " c1; read -p "V1: " v1; read -p "C2: " c2; read -p "V2: " v2
+                if [ -z "$c1" ]; then res=$(echo "($c2*$v2)/$v1" | bc -l); echo "C1 = $res"
+                elif [ -z "$v1" ]; then res=$(echo "($c2*$v2)/$c1" | bc -l); echo "V1 = $res"
+                elif [ -z "$c2" ]; then res=$(echo "($c1*$v1)/$v2" | bc -l); echo "C2 = $res"
+                elif [ -z "$v2" ]; then res=$(echo "($c1*$v1)/$c2" | bc -l); echo "V2 = $res"
+                else echo "All given: C1V1=$(echo "$c1*$v1"|bc), C2V2=$(echo "$c2*$v2"|bc)"; fi
+                read -p "Press Enter to continue..."
+                ;;
+            6)
+                clear
+                echo "--- Half-Life ---"
+                echo "1) N(t)  2) N0  3) Time  4) Half-life"
+                read -p "Choice: " hl_choice
+                case $hl_choice in
+                    1) read -p "N0, t_half, t: " n0 th t; res=$(echo "$n0*(0.5^($t/$th))" | bc -l); echo "N(t) = $res" ;;
+                    2) read -p "Nt, t_half, t: " nt th t; res=$(echo "$nt/(0.5^($t/$th))" | bc -l); echo "N0 = $res" ;;
+                    3) read -p "N0, Nt, t_half: " n0 nt th; res=$(echo "$th*l($nt/$n0)/l(0.5)" | bc -l); echo "t = $res" ;;
+                    4) read -p "N0, Nt, t: " n0 nt t; res=$(echo "$t*l(0.5)/l($nt/$n0)" | bc -l); echo "t_half = $res" ;;
+                esac
+                read -p "Press Enter to continue..."
+                ;;
+            0) return ;;
+            *) echo "Invalid"; sleep 1 ;;
+        esac
+    done
+}
+
+biology_solver() {
+    while true; do
+        clear
+        echo -e "${BLUE}=========================================="
+        echo "         BIOLOGY SOLVER SUITE"
+        echo -e "==========================================${NC}"
+        echo "[1] Population Growth"
+        echo "[2] Microscopy Mag/FOV"
+        echo "[3] BMI Calculator"
+        echo "[4] DNA Complement"
+        echo "[5] Q10 Coefficient"
+        echo "[0] Back to Settings"
+        echo "------------------------------------------"
+        read -p "Select Option: " bio_choice
+        case $bio_choice in
+            1)
+                clear; echo "--- Population Growth (Nt=N0*e^(rt)) ---"
+                read -p "N0: " n0; read -p "r: " r; read -p "t: " t
+                res=$(echo "$n0*e($r*$t)" | bc -l)
+                printf "Population: %.2f\n" "$res"
+                read -p "Press Enter..." ;;
+            2)
+                clear; echo "--- Microscopy ---"
+                echo "1) Magnification  2) FOV"
+                read -p "Choice: " mc
+                if [ "$mc" == "1" ]; then
+                    read -p "Ocular: " oc; read -p "Objective: " obj
+                    echo "Total Mag: $(($oc*$obj))x"
+                else
+                    read -p "Known FOV: " fl; read -p "Known Mag: " ml; read -p "New Mag: " mn
+                    res=$(echo "$fl*($ml/$mn)" | bc -l)
+                    echo "New FOV: $res"
+                fi
+                read -p "Press Enter..." ;;
+            3)
+                clear; echo "--- BMI ---"
+                echo "1) Metric  2) Imperial"
+                read -p "System: " sys
+                if [ "$sys" == "1" ]; then read -p "kg: " w; read -p "m: " h; res=$(echo "$w/($h*$h)" | bc -l)
+                else read -p "lbs: " w; read -p "in: " h; res=$(echo "703*$w/($h*$h)" | bc -l); fi
+                printf "BMI: %.2f\n" "$res"
+                read -p "Press Enter..." ;;
+            4)
+                clear; echo "--- DNA Complement ---"
+                read -p "Sequence: " seq; seq=$(echo "$seq" | tr 'a-z' 'A-Z')
+                comp=""; for ((i=0;i<${#seq};i++)); do b="${seq:$i:1}"; case $b in A)comp+="T";;T)comp+="A";;C)comp+="G";;G)comp+="C";;*)comp+="$b";;esac; done
+                echo "Original: $seq"; echo "Complement: $comp"
+                read -p "Press Enter..." ;;
+            5)
+                clear; echo "--- Q10 ---"
+                read -p "R1: " r1; read -p "R2: " r2; read -p "T1: " t1; read -p "T2: " t2
+                diff=$(echo "$t2-$t1" | bc -l)
+                if [ "$diff" != "0" ]; then exp=$(echo "10/$diff" | bc -l); ratio=$(echo "$r2/$r1" | bc -l); res=$(echo "e($exp*l($ratio))" | bc -l); echo "Q10 = $res"; fi
+                read -p "Press Enter..." ;;
+            0) return ;;
+            *) echo "Invalid"; sleep 1 ;;
+        esac
+    done
+}
+
 # --- Credits Menu ---
 show_credits() {
     echo -e "${YELLOW}┌──────────────────────────────────────────┐${NC}"
@@ -1180,6 +1412,11 @@ show_credits() {
     echo -e ""
     echo -e "${WHITE}  Code Architect:                          ${NC}"
     echo -e "${MAGENTA}  Antigravity (AI Assistant)               ${NC}"
+    echo -e ""
+    echo -e "${WHITE}  Features: Scientific, Complex, Matrix,   ${NC}"
+    echo -e "${WHITE}            Base-N, Equation Solver,       ${NC}"
+    echo -e "${WHITE}            Statistics, Tables, Chemistry, ${NC}"
+    echo -e "${WHITE}            Biology Solvers                ${NC}"
     echo -e "${YELLOW}├──────────────────────────────────────────┤${NC}"
     echo -e "${WHITE}  [b] Back                                 ${NC}"
     echo -e "${YELLOW}└──────────────────────────────────────────┘${NC}"
@@ -1221,6 +1458,9 @@ settings_menu() {
         echo -e "${WHITE}  [D] Display Format:  ${CYAN}${FORMAT}${NC}"
         echo -e "${WHITE}  [E] Precision:       ${CYAN}${PRECISION}${NC}"
         echo -e "${WHITE}  [F] Unit System:     ${CYAN}${UNIT_SYSTEM^^}${NC}"
+        echo -e "${WHITE}  ── Specialized Solvers ───────────────────────────  ${NC}"
+        echo -e "${WHITE}  [G] Chemistry Solver ${NC}"
+        echo -e "${WHITE}  [H] Biology Solver   ${NC}"
         echo -e "${WHITE}  ──────────────────────────────────────────────────  ${NC}"
         echo -e "${WHITE}  [Q] Back to Main Menu                              ${NC}"
         echo -e "${YELLOW}└────────────────────────────────────────────────────┘${NC}"
@@ -1228,6 +1468,8 @@ settings_menu() {
         read -p "Select option: " opt
         
         case $opt in
+            G) chemistry_solver ;;
+            H) biology_solver ;;
             1) # Input Mode
                 echo -e "${YELLOW}Input Modes:${NC}"
                 echo -e "  [1] MathI  - Math input (natural display)"
