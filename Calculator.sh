@@ -3,11 +3,41 @@
 # --- Settings ---
 FORMAT="normal" # normal, sci_e, sci_pow
 PRECISION=4
-ANGLE_MODE="deg" # deg, rad
+ANGLE_MODE="deg" # deg, rad, grad
+ANGLE_UNIT="deg" # deg, rad, grad
 UNIT_SYSTEM="metric" # metric, imperial
 LAST_RESULT=0
 COUNT=0
 HISTORY_FILE=".valty_history"
+
+# Input/Output Settings
+INPUT_MODE="MathI" # MathI, Math0, LineI, Line0
+OUTPUT_MODE="Math0" # Math0, Decimal0
+
+# Number Format Settings
+NUM_FORMAT="Norm" # Fix, Sci, Norm
+ENG_SYMBOL="off" # on, off
+
+# Fraction Settings
+FRAC_RESULT="ab/c" # ab/c, d/c
+
+# Complex Settings
+COMPLEX_FORMAT="a+bi" # a+bi, r<theta
+
+# Statistics Settings
+STAT_FREQ="off" # on, off
+
+# Equation Settings
+EQ_COMPLEX_RESULT="on" # on, off
+
+# Table Settings
+TABLE_MODE="f(x)" # f(x), f(x)+g(x)
+
+# Display Settings
+DECIMAL_MARK="dot" # dot, comma
+DIGIT_SEP="off" # on, off
+MULTILINE_FONT="normal" # normal, small
+
 set -o pipefail # Better error handling in pipes
 touch "$HISTORY_FILE" && chmod 600 "$HISTORY_FILE"
 # Note: History file is preserved between sessions for user convenience
@@ -80,6 +110,7 @@ show_header() {
     echo -e "  ${MAGENTA}╚══════════════════════════════════════════════╝${NC}${GRAY}█${NC}"
     echo -e "   ${GRAY}▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀${NC}"
     echo -e "    ${WHITE}Mode: ${YELLOW}${FORMAT}${NC} | ${WHITE}Angle: ${YELLOW}${ANGLE_MODE^^}${NC} | ${WHITE}Prec: ${YELLOW}${PRECISION}${NC} | ${WHITE}Units: ${YELLOW}${UNIT_SYSTEM^^}${NC}"
+    echo -e "    ${WHITE}IO: ${YELLOW}${INPUT_MODE}/${OUTPUT_MODE}${NC} | ${WHITE}NumFmt: ${YELLOW}${NUM_FORMAT}${NC} | ${WHITE}Complex: ${YELLOW}${COMPLEX_FORMAT}${NC}"
     echo -e "    ${WHITE}Status: ${GREEN}ONLINE ●${NC}"
     echo -e "  ${MAGENTA}────────────────────────────────────────────────${NC}"
 }
@@ -1131,6 +1162,153 @@ show_credits() {
     show_header
 }
 
+# --- Settings Menu Function ---
+settings_menu() {
+    local settings_done=false
+    while [[ "$settings_done" == "false" ]]; do
+        clear
+        echo -e "${YELLOW}┌────────────────────────────────────────────────────┐${NC}"
+        echo -e "${YELLOW}│              VALTY OS: SETTINGS                    │${NC}"
+        echo -e "${YELLOW}├────────────────────────────────────────────────────┤${NC}"
+        echo -e "${WHITE}  ── Input/Output ──────────────────────────────────  ${NC}"
+        echo -e "${WHITE}  [1] Input Mode:      ${CYAN}${INPUT_MODE}${NC}"
+        echo -e "${WHITE}  [2] Output Mode:     ${CYAN}${OUTPUT_MODE}${NC}"
+        echo -e "${WHITE}  ── Angle Unit ────────────────────────────────────  ${NC}"
+        echo -e "${WHITE}  [3] Angle Unit:      ${CYAN}${ANGLE_MODE^^}${NC} (deg/rad/grad)"
+        echo -e "${WHITE}  ── Number Format ─────────────────────────────────  ${NC}"
+        echo -e "${WHITE}  [4] Number Format:   ${CYAN}${NUM_FORMAT}${NC} (Fix/Sci/Norm)"
+        echo -e "${WHITE}  [5] Engineer Symbol: ${CYAN}${ENG_SYMBOL^^}${NC}"
+        echo -e "${WHITE}  ── Fraction Result ───────────────────────────────  ${NC}"
+        echo -e "${WHITE}  [6] Fraction Format: ${CYAN}${FRAC_RESULT}${NC}"
+        echo -e "${WHITE}  ── Complex Format ────────────────────────────────  ${NC}"
+        echo -e "${WHITE}  [7] Complex Format:  ${CYAN}${COMPLEX_FORMAT}${NC}"
+        echo -e "${WHITE}  ── Statistics ────────────────────────────────────  ${NC}"
+        echo -e "${WHITE}  [8] Frequency:       ${CYAN}${STAT_FREQ^^}${NC}"
+        echo -e "${WHITE}  ── Equation/Function ─────────────────────────────  ${NC}"
+        echo -e "${WHITE}  [9] Complex Result:  ${CYAN}${EQ_COMPLEX_RESULT^^}${NC}"
+        echo -e "${WHITE}  ── Table ─────────────────────────────────────────  ${NC}"
+        echo -e "${WHITE}  [0] Table Mode:      ${CYAN}${TABLE_MODE}${NC}"
+        echo -e "${WHITE}  ── Display ───────────────────────────────────────  ${NC}"
+        echo -e "${WHITE}  [A] Decimal Mark:    ${CYAN}${DECIMAL_MARK^^}${NC}"
+        echo -e "${WHITE}  [B] Digit Separator: ${CYAN}${DIGIT_SEP^^}${NC}"
+        echo -e "${WHITE}  [C] MultiLine Font:  ${CYAN}${MULTILINE_FONT^^}${NC}"
+        echo -e "${WHITE}  ── Basic Settings ────────────────────────────────  ${NC}"
+        echo -e "${WHITE}  [D] Display Format:  ${CYAN}${FORMAT}${NC}"
+        echo -e "${WHITE}  [E] Precision:       ${CYAN}${PRECISION}${NC}"
+        echo -e "${WHITE}  [F] Unit System:     ${CYAN}${UNIT_SYSTEM^^}${NC}"
+        echo -e "${WHITE}  ──────────────────────────────────────────────────  ${NC}"
+        echo -e "${WHITE}  [Q] Back to Main Menu                              ${NC}"
+        echo -e "${YELLOW}└────────────────────────────────────────────────────┘${NC}"
+        echo ""
+        read -p "Select option: " opt
+        
+        case $opt in
+            1) # Input Mode
+                echo -e "${YELLOW}Input Modes:${NC}"
+                echo -e "  [1] MathI  - Math input (natural display)"
+                echo -e "  [2] Math0  - Math input, decimal output"
+                echo -e "  [3] LineI  - Linear input"
+                echo -e "  [4] Line0  - Linear input/output"
+                read -p "Select: " im
+                case $im in
+                    1) INPUT_MODE="MathI" ;;
+                    2) INPUT_MODE="Math0" ;;
+                    3) INPUT_MODE="LineI" ;;
+                    4) INPUT_MODE="Line0" ;;
+                esac
+                ;;
+            2) # Output Mode
+                echo -e "${YELLOW}Output Modes:${NC}"
+                echo -e "  [1] Math0    - Natural display output"
+                echo -e "  [2] Decimal0 - Decimal output"
+                read -p "Select: " om
+                case $om in
+                    1) OUTPUT_MODE="Math0" ;;
+                    2) OUTPUT_MODE="Decimal0" ;;
+                esac
+                ;;
+            3) # Angle Unit
+                echo -e "${YELLOW}Angle Units:${NC}"
+                echo -e "  [1] Degrees  (deg)"
+                echo -e "  [2] Radians  (rad)"
+                echo -e "  [3] Gradians (grad)"
+                read -p "Select: " am
+                case $am in
+                    1) ANGLE_MODE="deg" ;;
+                    2) ANGLE_MODE="rad" ;;
+                    3) ANGLE_MODE="grad" ;;
+                esac
+                ;;
+            4) # Number Format
+                echo -e "${YELLOW}Number Formats:${NC}"
+                echo -e "  [1] Fix  - Fixed decimal places"
+                echo -e "  [2] Sci  - Scientific notation"
+                echo -e "  [3] Norm - Normal display"
+                read -p "Select: " nf
+                case $nf in
+                    1) NUM_FORMAT="Fix" ;;
+                    2) NUM_FORMAT="Sci" ;;
+                    3) NUM_FORMAT="Norm" ;;
+                esac
+                ;;
+            5) # Engineer Symbol
+                [[ "$ENG_SYMBOL" == "off" ]] && ENG_SYMBOL="on" || ENG_SYMBOL="off"
+                ;;
+            6) # Fraction Format
+                [[ "$FRAC_RESULT" == "ab/c" ]] && FRAC_RESULT="d/c" || FRAC_RESULT="ab/c"
+                ;;
+            7) # Complex Format
+                [[ "$COMPLEX_FORMAT" == "a+bi" ]] && COMPLEX_FORMAT="r<theta" || COMPLEX_FORMAT="a+bi"
+                ;;
+            8) # Statistics Frequency
+                [[ "$STAT_FREQ" == "off" ]] && STAT_FREQ="on" || STAT_FREQ="off"
+                ;;
+            9) # Equation Complex Result
+                [[ "$EQ_COMPLEX_RESULT" == "off" ]] && EQ_COMPLEX_RESULT="on" || EQ_COMPLEX_RESULT="off"
+                ;;
+            0) # Table Mode
+                [[ "$TABLE_MODE" == "f(x)" ]] && TABLE_MODE="f(x)+g(x)" || TABLE_MODE="f(x)"
+                ;;
+            A|a) # Decimal Mark
+                [[ "$DECIMAL_MARK" == "dot" ]] && DECIMAL_MARK="comma" || DECIMAL_MARK="dot"
+                ;;
+            B|b) # Digit Separator
+                [[ "$DIGIT_SEP" == "off" ]] && DIGIT_SEP="on" || DIGIT_SEP="off"
+                ;;
+            C|c) # MultiLine Font
+                [[ "$MULTILINE_FONT" == "normal" ]] && MULTILINE_FONT="small" || MULTILINE_FONT="normal"
+                ;;
+            D|d) # Display Format
+                echo -e "${YELLOW}Display Formats:${NC}"
+                echo -e "  [1] Normal     (0.0001)"
+                echo -e "  [2] Sci (e)    (1e-4)"
+                echo -e "  [3] Sci (pow)  (1*10^-4)"
+                read -p "Select: " df
+                case $df in
+                    1) FORMAT="normal" ;;
+                    2) FORMAT="sci_e" ;;
+                    3) FORMAT="sci_pow" ;;
+                esac
+                ;;
+            E|e) # Precision
+                read -p "Enter precision (0-15): " prec
+                if [[ "$prec" =~ ^[0-9]+$ ]] && [ "$prec" -ge 0 ] && [ "$prec" -le 15 ]; then
+                    PRECISION=$prec
+                else
+                    echo -e "${RED}Invalid precision.${NC}"
+                    sleep 1
+                fi
+                ;;
+            F|f) # Unit System
+                [[ "$UNIT_SYSTEM" == "metric" ]] && UNIT_SYSTEM="imperial" || UNIT_SYSTEM="metric"
+                ;;
+            Q|q) # Quit
+                settings_done=true
+                ;;
+        esac
+    done
+}
+
 # --- Complex Numbers Calculator ---
 solve_complex() {
     echo -e "${CYAN}--- COMPLEX NUMBERS CALCULATOR ---${NC}"
@@ -1900,26 +2078,7 @@ while true; do
         show_header; continue
     elif [[ "$input" == "s" ]]; then
         # --- Settings Menu ---
-        echo -e "${YELLOW}┌──────────────────────────────────────────┐${NC}"
-        echo -e "${YELLOW}│            VALTY OS: SETTINGS            │${NC}"
-        echo -e "${YELLOW}├──────────────────────────────────────────┤${NC}"
-        echo -e "${WHITE}  [1] Normal (0.0001)                      ${NC}"
-        echo -e "${WHITE}  [2] Scientific (1e-4)                    ${NC}"
-        echo -e "${WHITE}  [3] Scientific (* 10^x)                  ${NC}"
-        echo -e "${WHITE}  [4] Change Precision (0-15)              ${NC}"
-        echo -e "${WHITE}  [5] Toggle Angle Mode (DEG/RAD)          ${NC}"
-        echo -e "${WHITE}  [6] Toggle Unit System (MET/IMP)         ${NC}"
-        echo -e "${WHITE}  [b] Back                                 ${NC}"
-        echo -e "${YELLOW}└──────────────────────────────────────────┘${NC}"
-        read -p "Select option: " opt
-        case $opt in
-            1) FORMAT="normal" ;;
-            2) FORMAT="sci_e" ;;
-            3) FORMAT="sci_pow" ;;
-            4) read -p "Enter precision: " prec; [[ "$prec" =~ ^[0-9]+$ ]] && PRECISION=$prec ;;
-            5) [[ "$ANGLE_MODE" == "deg" ]] && ANGLE_MODE="rad" || ANGLE_MODE="deg" ;;
-            6) [[ "$UNIT_SYSTEM" == "metric" ]] && UNIT_SYSTEM="imperial" || UNIT_SYSTEM="metric" ;;
-        esac
+        settings_menu
         show_header; continue
     elif [[ "$input" == "itachi" || "$input" == "sharingan" ]]; then
         show_easter_egg "itachi"; continue
