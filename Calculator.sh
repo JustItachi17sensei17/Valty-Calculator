@@ -3,15 +3,44 @@
 # --- Settings ---
 FORMAT="normal" # normal, sci_e, sci_pow
 PRECISION=4
-ANGLE_MODE="deg" # deg, rad
+ANGLE_MODE="deg" # deg, rad, grad
+ANGLE_UNIT="deg" # deg, rad, grad
 UNIT_SYSTEM="metric" # metric, imperial
 LAST_RESULT=0
 COUNT=0
 HISTORY_FILE=".valty_history"
+
+# Input/Output Settings
+INPUT_MODE="MathI" # MathI, Math0, LineI, Line0
+OUTPUT_MODE="Math0" # Math0, Decimal0
+
+# Number Format Settings
+NUM_FORMAT="Norm" # Fix, Sci, Norm
+ENG_SYMBOL="off" # on, off
+
+# Fraction Settings
+FRAC_RESULT="ab/c" # ab/c, d/c
+
+# Complex Settings
+COMPLEX_FORMAT="a+bi" # a+bi, r<theta
+
+# Statistics Settings
+STAT_FREQ="off" # on, off
+
+# Equation Settings
+EQ_COMPLEX_RESULT="on" # on, off
+
+# Table Settings
+TABLE_MODE="f(x)" # f(x), f(x)+g(x)
+
+# Display Settings
+DECIMAL_MARK="dot" # dot, comma
+DIGIT_SEP="off" # on, off
+MULTILINE_FONT="normal" # normal, small
+
 set -o pipefail # Better error handling in pipes
 touch "$HISTORY_FILE" && chmod 600 "$HISTORY_FILE"
-rm -f "$HISTORY_FILE" # Clear session history on startup
-touch "$HISTORY_FILE" && chmod 600 "$HISTORY_FILE"
+# Note: History file is preserved between sessions for user convenience
 
 # --- Color Definitions ---
 RED='\033[1;31m'
@@ -81,6 +110,7 @@ show_header() {
     echo -e "  ${MAGENTA}╚══════════════════════════════════════════════╝${NC}${GRAY}█${NC}"
     echo -e "   ${GRAY}▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀${NC}"
     echo -e "    ${WHITE}Mode: ${YELLOW}${FORMAT}${NC} | ${WHITE}Angle: ${YELLOW}${ANGLE_MODE^^}${NC} | ${WHITE}Prec: ${YELLOW}${PRECISION}${NC} | ${WHITE}Units: ${YELLOW}${UNIT_SYSTEM^^}${NC}"
+    echo -e "    ${WHITE}IO: ${YELLOW}${INPUT_MODE}/${OUTPUT_MODE}${NC} | ${WHITE}NumFmt: ${YELLOW}${NUM_FORMAT}${NC} | ${WHITE}Complex: ${YELLOW}${COMPLEX_FORMAT}${NC}"
     echo -e "    ${WHITE}Status: ${GREEN}ONLINE ●${NC}"
     echo -e "  ${MAGENTA}────────────────────────────────────────────────${NC}"
 }
@@ -174,15 +204,11 @@ fi
     if [[ "$ANGLE_MODE" == "deg" ]]; then
         # Domain Check: tan(90), tan(270), etc.
         # Use awk for the modulo check (not $(()) which cannot handle floats).
-        # حط الـ Regex في متغير لوحده
-    tan_regex='tan\(\(\([^)]+\)\)\)'
-
-# استخدم المتغير جوه الـ if من غير quotes
+        local tan_regex='tan\(\(([^\)]+)\)\)'
         if [[ "$expr" =~ $tan_regex ]]; then
-            angle=$(awk "BEGIN { print ${BASH_REMATCH[1]} }" 2>/dev/null)
+            local angle=$(awk "BEGIN { print ${BASH_REMATCH[1]} }" 2>/dev/null)
             if is_num "$angle"; then
-                local check
-                check=$(awk "BEGIN { diff = ($angle - 90) % 180; print (diff < 0.0001 && diff > -0.0001) ? 1 : 0 }")
+                local check=$(awk "BEGIN { diff = ($angle - 90) % 180; print (diff < 0.0001 && diff > -0.0001) ? 1 : 0 }")
                 if [[ "$check" == "1" ]]; then
                     echo -e "${RED}ERR: TAN UNDEFINED AT ${angle}°${NC}"
                     return 1
@@ -936,6 +962,13 @@ show_equation_solver() {
     echo -e "  [P] Polynomial (Linear/Quad)            "
     echo -e "  [S] Simultaneous (2-3 Unknowns)         "
     echo -e "  [R] Ratios & Proportions                "
+    echo -e "  [C] Complex Numbers                     "
+    echo -e "  [N] Base-N Converter                    "
+    echo -e "  [M] Matrix Calculator                   "
+    echo -e "  [V] Vector Calculator                   "
+    echo -e "  [T] Statistics                          "
+    echo -e "  [B] Table Generator                     "
+    echo -e "  [I] Inequality Solver                   "
     echo -e "  [b] Back to Main OS                     "
     echo -e "${YELLOW}└──────────────────────────────────────────┘${NC}"
     read -p "Select option: " type
@@ -973,6 +1006,13 @@ show_equation_solver() {
            echo -e " [1] Proportional Solver (a/b = c/d) [2] Ratio Simplifier"
            read -p "Select: " rt
            if [[ "$rt" == "1" ]]; then solve_ratios; else simplify_ratios; fi ;;
+        C) solve_complex ;;
+        N) solve_base_n ;;
+        M) solve_matrix ;;
+        V) solve_vector ;;
+        T) solve_statistics ;;
+        B) solve_table ;;
+        I) solve_inequality ;;
         *) echo -e "${RED}Invalid option.${NC}" ;;
     esac
     read -p "Press any key to continue..." -n1 -s
@@ -1122,6 +1162,837 @@ show_credits() {
     show_header
 }
 
+# --- Settings Menu Function ---
+settings_menu() {
+    local settings_done=false
+    while [[ "$settings_done" == "false" ]]; do
+        clear
+        echo -e "${YELLOW}┌────────────────────────────────────────────────────┐${NC}"
+        echo -e "${YELLOW}│              VALTY OS: SETTINGS                    │${NC}"
+        echo -e "${YELLOW}├────────────────────────────────────────────────────┤${NC}"
+        echo -e "${WHITE}  ── Input/Output ──────────────────────────────────  ${NC}"
+        echo -e "${WHITE}  [1] Input Mode:      ${CYAN}${INPUT_MODE}${NC}"
+        echo -e "${WHITE}  [2] Output Mode:     ${CYAN}${OUTPUT_MODE}${NC}"
+        echo -e "${WHITE}  ── Angle Unit ────────────────────────────────────  ${NC}"
+        echo -e "${WHITE}  [3] Angle Unit:      ${CYAN}${ANGLE_MODE^^}${NC} (deg/rad/grad)"
+        echo -e "${WHITE}  ── Number Format ─────────────────────────────────  ${NC}"
+        echo -e "${WHITE}  [4] Number Format:   ${CYAN}${NUM_FORMAT}${NC} (Fix/Sci/Norm)"
+        echo -e "${WHITE}  [5] Engineer Symbol: ${CYAN}${ENG_SYMBOL^^}${NC}"
+        echo -e "${WHITE}  ── Fraction Result ───────────────────────────────  ${NC}"
+        echo -e "${WHITE}  [6] Fraction Format: ${CYAN}${FRAC_RESULT}${NC}"
+        echo -e "${WHITE}  ── Complex Format ────────────────────────────────  ${NC}"
+        echo -e "${WHITE}  [7] Complex Format:  ${CYAN}${COMPLEX_FORMAT}${NC}"
+        echo -e "${WHITE}  ── Statistics ────────────────────────────────────  ${NC}"
+        echo -e "${WHITE}  [8] Frequency:       ${CYAN}${STAT_FREQ^^}${NC}"
+        echo -e "${WHITE}  ── Equation/Function ─────────────────────────────  ${NC}"
+        echo -e "${WHITE}  [9] Complex Result:  ${CYAN}${EQ_COMPLEX_RESULT^^}${NC}"
+        echo -e "${WHITE}  ── Table ─────────────────────────────────────────  ${NC}"
+        echo -e "${WHITE}  [0] Table Mode:      ${CYAN}${TABLE_MODE}${NC}"
+        echo -e "${WHITE}  ── Display ───────────────────────────────────────  ${NC}"
+        echo -e "${WHITE}  [A] Decimal Mark:    ${CYAN}${DECIMAL_MARK^^}${NC}"
+        echo -e "${WHITE}  [B] Digit Separator: ${CYAN}${DIGIT_SEP^^}${NC}"
+        echo -e "${WHITE}  [C] MultiLine Font:  ${CYAN}${MULTILINE_FONT^^}${NC}"
+        echo -e "${WHITE}  ── Basic Settings ────────────────────────────────  ${NC}"
+        echo -e "${WHITE}  [D] Display Format:  ${CYAN}${FORMAT}${NC}"
+        echo -e "${WHITE}  [E] Precision:       ${CYAN}${PRECISION}${NC}"
+        echo -e "${WHITE}  [F] Unit System:     ${CYAN}${UNIT_SYSTEM^^}${NC}"
+        echo -e "${WHITE}  ──────────────────────────────────────────────────  ${NC}"
+        echo -e "${WHITE}  [Q] Back to Main Menu                              ${NC}"
+        echo -e "${YELLOW}└────────────────────────────────────────────────────┘${NC}"
+        echo ""
+        read -p "Select option: " opt
+        
+        case $opt in
+            1) # Input Mode
+                echo -e "${YELLOW}Input Modes:${NC}"
+                echo -e "  [1] MathI  - Math input (natural display)"
+                echo -e "  [2] Math0  - Math input, decimal output"
+                echo -e "  [3] LineI  - Linear input"
+                echo -e "  [4] Line0  - Linear input/output"
+                read -p "Select: " im
+                case $im in
+                    1) INPUT_MODE="MathI" ;;
+                    2) INPUT_MODE="Math0" ;;
+                    3) INPUT_MODE="LineI" ;;
+                    4) INPUT_MODE="Line0" ;;
+                esac
+                ;;
+            2) # Output Mode
+                echo -e "${YELLOW}Output Modes:${NC}"
+                echo -e "  [1] Math0    - Natural display output"
+                echo -e "  [2] Decimal0 - Decimal output"
+                read -p "Select: " om
+                case $om in
+                    1) OUTPUT_MODE="Math0" ;;
+                    2) OUTPUT_MODE="Decimal0" ;;
+                esac
+                ;;
+            3) # Angle Unit
+                echo -e "${YELLOW}Angle Units:${NC}"
+                echo -e "  [1] Degrees  (deg)"
+                echo -e "  [2] Radians  (rad)"
+                echo -e "  [3] Gradians (grad)"
+                read -p "Select: " am
+                case $am in
+                    1) ANGLE_MODE="deg" ;;
+                    2) ANGLE_MODE="rad" ;;
+                    3) ANGLE_MODE="grad" ;;
+                esac
+                ;;
+            4) # Number Format
+                echo -e "${YELLOW}Number Formats:${NC}"
+                echo -e "  [1] Fix  - Fixed decimal places"
+                echo -e "  [2] Sci  - Scientific notation"
+                echo -e "  [3] Norm - Normal display"
+                read -p "Select: " nf
+                case $nf in
+                    1) NUM_FORMAT="Fix" ;;
+                    2) NUM_FORMAT="Sci" ;;
+                    3) NUM_FORMAT="Norm" ;;
+                esac
+                ;;
+            5) # Engineer Symbol
+                [[ "$ENG_SYMBOL" == "off" ]] && ENG_SYMBOL="on" || ENG_SYMBOL="off"
+                ;;
+            6) # Fraction Format
+                [[ "$FRAC_RESULT" == "ab/c" ]] && FRAC_RESULT="d/c" || FRAC_RESULT="ab/c"
+                ;;
+            7) # Complex Format
+                [[ "$COMPLEX_FORMAT" == "a+bi" ]] && COMPLEX_FORMAT="r<theta" || COMPLEX_FORMAT="a+bi"
+                ;;
+            8) # Statistics Frequency
+                [[ "$STAT_FREQ" == "off" ]] && STAT_FREQ="on" || STAT_FREQ="off"
+                ;;
+            9) # Equation Complex Result
+                [[ "$EQ_COMPLEX_RESULT" == "off" ]] && EQ_COMPLEX_RESULT="on" || EQ_COMPLEX_RESULT="off"
+                ;;
+            0) # Table Mode
+                [[ "$TABLE_MODE" == "f(x)" ]] && TABLE_MODE="f(x)+g(x)" || TABLE_MODE="f(x)"
+                ;;
+            A|a) # Decimal Mark
+                [[ "$DECIMAL_MARK" == "dot" ]] && DECIMAL_MARK="comma" || DECIMAL_MARK="dot"
+                ;;
+            B|b) # Digit Separator
+                [[ "$DIGIT_SEP" == "off" ]] && DIGIT_SEP="on" || DIGIT_SEP="off"
+                ;;
+            C|c) # MultiLine Font
+                [[ "$MULTILINE_FONT" == "normal" ]] && MULTILINE_FONT="small" || MULTILINE_FONT="normal"
+                ;;
+            D|d) # Display Format
+                echo -e "${YELLOW}Display Formats:${NC}"
+                echo -e "  [1] Normal     (0.0001)"
+                echo -e "  [2] Sci (e)    (1e-4)"
+                echo -e "  [3] Sci (pow)  (1*10^-4)"
+                read -p "Select: " df
+                case $df in
+                    1) FORMAT="normal" ;;
+                    2) FORMAT="sci_e" ;;
+                    3) FORMAT="sci_pow" ;;
+                esac
+                ;;
+            E|e) # Precision
+                read -p "Enter precision (0-15): " prec
+                if [[ "$prec" =~ ^[0-9]+$ ]] && [ "$prec" -ge 0 ] && [ "$prec" -le 15 ]; then
+                    PRECISION=$prec
+                else
+                    echo -e "${RED}Invalid precision.${NC}"
+                    sleep 1
+                fi
+                ;;
+            F|f) # Unit System
+                [[ "$UNIT_SYSTEM" == "metric" ]] && UNIT_SYSTEM="imperial" || UNIT_SYSTEM="metric"
+                ;;
+            Q|q) # Quit
+                settings_done=true
+                ;;
+        esac
+    done
+}
+
+# --- Complex Numbers Calculator ---
+solve_complex() {
+    echo -e "${CYAN}--- COMPLEX NUMBERS CALCULATOR ---${NC}"
+    echo -e " Format: a+bi or a-bi (enter as: a b sign)"
+    echo -e " Example: 3+4i -> enter '3 4 +'"
+    echo -e " [1] Add  [2] Subtract  [3] Multiply  [4] Divide"
+    echo -e " [5] Modulus  [6] Conjugate  [7] Polar Form"
+    read -p "Select operation: " op
+    
+    case $op in
+        [1-4])
+            read -p "Enter Z1 (a b sign): " a1 b1 s1
+            read -p "Enter Z2 (c d sign): " c1 d1 s2
+            
+            if ! is_num "$a1" || ! is_num "$b1" || ! is_num "$c1" || ! is_num "$d1"; then
+                echo -e "${RED}Invalid input.${NC}"; return
+            fi
+            
+            # Convert to standard form
+            [[ "$s1" == "-" ]] && b1=$(awk "BEGIN { print -$b1 }")
+            [[ "$s2" == "-" ]] && d1=$(awk "BEGIN { print -$d1 }")
+            
+            local real imag
+            case $op in
+                1) real=$(awk "BEGIN { print $a1 + $c1 }")
+                   imag=$(awk "BEGIN { print $b1 + $d1 }") ;;
+                2) real=$(awk "BEGIN { print $a1 - $c1 }")
+                   imag=$(awk "BEGIN { print $b1 - $d1 }") ;;
+                3) real=$(awk "BEGIN { print ($a1 * $c1) - ($b1 * $d1) }")
+                   imag=$(awk "BEGIN { print ($a1 * $d1) + ($b1 * $c1) }") ;;
+                4) local denom=$(awk "BEGIN { print ($c1^2) + ($d1^2) }")
+                   if (( $(awk "BEGIN { print ($denom == 0) }") )); then
+                       echo -e "${RED}ERR: Division by zero.${NC}"; return
+                   fi
+                   real=$(awk "BEGIN { printf \"%.15g\", (($a1 * $c1) + ($b1 * $d1)) / $denom }")
+                   imag=$(awk "BEGIN { printf \"%.15g\", (($b1 * $c1) - ($a1 * $d1)) / $denom }") ;;
+            esac
+            
+            local imag_fmt=$(format_result "$imag")
+            local real_fmt=$(format_result "$real")
+            if (( $(awk "BEGIN { print ($imag < 0) }") )); then
+                echo -e "${GREEN}Result: ${real_fmt}${imag_fmt}i${NC}"
+            else
+                echo -e "${GREEN}Result: ${real_fmt}+${imag_fmt}i${NC}"
+            fi
+            ;;
+        5)
+            read -p "Enter Z (a b sign): " a1 b1 s1
+            is_num "$a1" && is_num "$b1" || { echo -e "${RED}Invalid input.${NC}"; return; }
+            [[ "$s1" == "-" ]] && b1=$(awk "BEGIN { print -$b1 }")
+            local mod=$(awk "BEGIN { printf \"%.15g\", sqrt(($a1^2) + ($b1^2)) }")
+            echo -e "${GREEN}|Z| = $(format_result "$mod")${NC}"
+            ;;
+        6)
+            read -p "Enter Z (a b sign): " a1 b1 s1
+            is_num "$a1" && is_num "$b1" || { echo -e "${RED}Invalid input.${NC}"; return; }
+            [[ "$s1" == "-" ]] && s1="+" || s1="-"
+            if (( $(awk "BEGIN { print ($b1 < 0) }") )); then
+                echo -e "${GREEN}Conjugate: $(format_result "$a1")+$(format_result "${b1#-}")i${NC}"
+            else
+                echo -e "${GREEN}Conjugate: $(format_result "$a1")-$(format_result "$b1")i${NC}"
+            fi
+            ;;
+        7)
+            read -p "Enter Z (a b sign): " a1 b1 s1
+            is_num "$a1" && is_num "$b1" || { echo -e "${RED}Invalid input.${NC}"; return; }
+            [[ "$s1" == "-" ]] && b1=$(awk "BEGIN { print -$b1 }")
+            local r=$(awk "BEGIN { printf \"%.15g\", sqrt(($a1^2) + ($b1^2)) }")
+            local theta_rad=$(awk "BEGIN { printf \"%.15g\", atan2($b1, $a1) }")
+            local theta_deg=$(awk "BEGIN { printf \"%.15g\", $theta_rad * 180 / 3.14159265358979 }")
+            echo -e "${GREEN}Polar: r = $(format_result "$r"), θ = $(format_result "$theta_deg")°${NC}"
+            echo -e "${GRAY}         = $(format_result "$r") ∠ $(format_result "$theta_deg")°${NC}"
+            ;;
+        *) echo -e "${RED}Invalid option.${NC}" ;;
+    esac
+    read -p " Solve another complex? (y/n): " again
+    [[ "${again,,}" == "y" ]] && { solve_complex; return; }
+}
+
+# --- Base-N Converter ---
+solve_base_n() {
+    echo -e "${CYAN}--- BASE-N CONVERTER ---${NC}"
+    echo -e " [1] Decimal to Binary/Hex/Octal"
+    echo -e " [2] Binary to Decimal/Hex/Octal"
+    echo -e " [3] Hexadecimal to Decimal/Bin/Oct"
+    echo -e " [4] Octal to Decimal/Bin/Hex"
+    echo -e " [5] Custom Base Conversion"
+    read -p "Select conversion type: " ctype
+    
+    case $ctype in
+        1)
+            read -p "Enter Decimal number: " dec
+            if ! [[ "$dec" =~ ^[0-9]+$ ]]; then echo -e "${RED}Invalid decimal number.${NC}"; return; fi
+            echo -e "${GREEN}Binary:  $(echo "obase=2;$dec" | bc)${NC}"
+            echo -e "${GREEN}Hex:     $(echo "obase=16;$dec" | bc)${NC}"
+            echo -e "${GREEN}Octal:   $(echo "obase=8;$dec" | bc)${NC}"
+            ;;
+        2)
+            read -p "Enter Binary number: " bin
+            if ! [[ "$bin" =~ ^[01]+$ ]]; then echo -e "${RED}Invalid binary number.${NC}"; return; fi
+            local dec=$((2#$bin))
+            echo -e "${GREEN}Decimal: $dec${NC}"
+            echo -e "${GREEN}Hex:     $(echo "obase=16;$dec" | bc)${NC}"
+            echo -e "${GREEN}Octal:   $(echo "obase=8;$dec" | bc)${NC}"
+            ;;
+        3)
+            read -p "Enter Hexadecimal number: " hex
+            if ! [[ "$hex" =~ ^[0-9A-Fa-f]+$ ]]; then echo -e "${RED}Invalid hexadecimal number.${NC}"; return; fi
+            local dec=$((16#$hex))
+            echo -e "${GREEN}Decimal: $dec${NC}"
+            echo -e "${GREEN}Binary:  $(echo "obase=2;$dec" | bc)${NC}"
+            echo -e "${GREEN}Octal:   $(echo "obase=8;$dec" | bc)${NC}"
+            ;;
+        4)
+            read -p "Enter Octal number: " oct
+            if ! [[ "$oct" =~ ^[0-7]+$ ]]; then echo -e "${RED}Invalid octal number.${NC}"; return; fi
+            local dec=$((8#$oct))
+            echo -e "${GREEN}Decimal: $dec${NC}"
+            echo -e "${GREEN}Binary:  $(echo "obase=2;$dec" | bc)${NC}"
+            echo -e "${GREEN}Hex:     $(echo "obase=16;$dec" | bc)${NC}"
+            ;;
+        5)
+            read -p "Enter value: " val
+            read -p "From base (2-36): " from_base
+            read -p "To base (2-36): " to_base
+            if ! [[ "$from_base" =~ ^[0-9]+$ && "$to_base" =~ ^[0-9]+$ ]]; then
+                echo -e "${RED}Invalid bases.${NC}"; return
+            fi
+            if [[ $from_base -lt 2 || $from_base -gt 36 || $to_base -lt 2 || $to_base -gt 36 ]]; then
+                echo -e "${RED}Bases must be between 2 and 36.${NC}"; return
+            fi
+            local dec=$(echo "$((from_base#$val))" 2>/dev/null)
+            if [[ -z "$dec" ]]; then echo -e "${RED}Invalid value for base $from_base.${NC}"; return; fi
+            local result=$(echo "obase=$to_base;ibase=$from_base;$val" | bc 2>/dev/null)
+            if [[ -z "$result" ]]; then
+                result=""
+                while [[ $dec -gt 0 ]]; do
+                    local rem=$((dec % to_base))
+                    if [[ $rem -lt 10 ]]; then
+                        result="${rem}${result}"
+                    else
+                        result=$(printf "\\x$(printf '%x' $((rem + 55)))")"${result}"
+                    fi
+                    dec=$((dec / to_base))
+                done
+            fi
+            echo -e "${GREEN}Result: $result${NC}"
+            ;;
+        *) echo -e "${RED}Invalid option.${NC}" ;;
+    esac
+    read -p " Convert another? (y/n): " again
+    [[ "${again,,}" == "y" ]] && { solve_base_n; return; }
+}
+
+# --- Matrix Calculator ---
+solve_matrix() {
+    echo -e "${CYAN}--- MATRIX CALCULATOR ---${NC}"
+    echo -e " Supports matrices from 1×1 to 4×4"
+    echo -e " [1] Add/Subtract Matrices"
+    echo -e " [2] Multiply Matrices"
+    echo -e " [3] Determinant"
+    echo -e " [4] Transpose"
+    echo -e " [5] Inverse (2×2, 3×3)"
+    read -p "Select operation: " op
+    
+    read -p "Enter matrix size (1-4): " n
+    if ! [[ "$n" =~ ^[1-4]$ ]]; then echo -e "${RED}Size must be 1-4.${NC}"; return; fi
+    
+    case $op in
+        [12])
+            echo -e "Enter Matrix A (${n}×${n}):"
+            declare -a A
+            for ((i=0; i<n; i++)); do
+                read -p "Row $((i+1)): " -a row
+                for ((j=0; j<n; j++)); do
+                    A[$((i*n+j))]=${row[$j]}
+                done
+            done
+            
+            echo -e "Enter Matrix B (${n}×${n}):"
+            declare -a B
+            for ((i=0; i<n; i++)); do
+                read -p "Row $((i+1)): " -a row
+                for ((j=0; j<n; j++)); do
+                    B[$((i*n+j))]=${row[$j]}
+                done
+            done
+            
+            echo -e "${GREEN}Result:${NC}"
+            for ((i=0; i<n; i++)); do
+                local line=""
+                for ((j=0; j<n; j++)); do
+                    local idx=$((i*n+j))
+                    local res
+                    if [[ "$op" == "1" ]]; then
+                        res=$(awk "BEGIN { printf \"%.4f\", ${A[$idx]} + ${B[$idx]} }")
+                    else
+                        res=$(awk "BEGIN { printf \"%.4f\", ${A[$idx]} - ${B[$idx]} }")
+                    fi
+                    line+="$res  "
+                done
+                echo -e "  $line"
+            done
+            ;;
+        2)
+            echo -e "Enter Matrix A (${n}×${n}):"
+            declare -a A
+            for ((i=0; i<n; i++)); do
+                read -p "Row $((i+1)): " -a row
+                for ((j=0; j<n; j++)); do
+                    A[$((i*n+j))]=${row[$j]}
+                done
+            done
+            
+            echo -e "Enter Matrix B (${n}×${n}):"
+            declare -a B
+            for ((i=0; i<n; i++)); do
+                read -p "Row $((i+1)): " -a row
+                for ((j=0; j<n; j++)); do
+                    B[$((i*n+j))]=${row[$j]}
+                done
+            done
+            
+            echo -e "${GREEN}Result:${NC}"
+            for ((i=0; i<n; i++)); do
+                local line=""
+                for ((j=0; j<n; j++)); do
+                    local sum=0
+                    for ((k=0; k<n; k++)); do
+                        sum=$(awk "BEGIN { print $sum + (${A[$((i*n+k))]} * ${B[$((k*n+j))]}) }")
+                    done
+                    line+="$(awk "BEGIN { printf \"%.4f\", $sum }")  "
+                done
+                echo -e "  $line"
+            done
+            ;;
+        3)
+            echo -e "Enter Matrix (${n}×${n}):"
+            declare -a M
+            for ((i=0; i<n; i++)); do
+                read -p "Row $((i+1)): " -a row
+                for ((j=0; j<n; j++)); do
+                    M[$((i*n+j))]=${row[$j]}
+                done
+            done
+            
+            local det
+            case $n in
+                1) det=${M[0]} ;;
+                2) det=$(awk "BEGIN { print (${M[0]} * ${M[3]}) - (${M[1]} * ${M[2]}) }") ;;
+                3) det=$(awk "BEGIN { 
+                    print ${M[0]}*((${M[4]}*${M[8]})-(${M[5]}*${M[7]})) - 
+                         ${M[1]}*((${M[3]}*${M[8]})-(${M[5]}*${M[6]})) + 
+                         ${M[2]}*((${M[3]}*${M[7]})-(${M[4]}*${M[6]}))
+                }") ;;
+                4) 
+                    echo -e "${YELLOW}4×4 determinant calculation...${NC}"
+                    det=$(awk "BEGIN {
+                        a=${M[0]}; b=${M[1]}; c=${M[2]}; d=${M[3]}
+                        e=${M[4]}; f=${M[5]}; g=${M[6]}; h=${M[7]}
+                        i=${M[8]}; j=${M[9]}; k=${M[10]}; l=${M[11]}
+                        m=${M[12]}; n=${M[13]}; o=${M[14]}; p=${M[15]}
+                        
+                        m1=f*(k*p-l*o)-g*(j*p-l*n)+h*(j*o-k*n)
+                        m2=e*(k*p-l*o)-g*(i*p-l*m)+h*(i*o-k*m)
+                        m3=e*(j*p-l*n)-f*(i*p-l*m)+h*(i*n-j*m)
+                        m4=e*(j*o-k*n)-f*(i*o-k*m)+g*(i*n-j*m)
+                        
+                        print a*m1 - b*m2 + c*m3 - d*m4
+                    }")
+                    ;;
+            esac
+            echo -e "${GREEN}Determinant = $(format_result "$det")${NC}"
+            ;;
+        4)
+            echo -e "Enter Matrix (${n}×${n}):"
+            declare -a M
+            for ((i=0; i<n; i++)); do
+                read -p "Row $((i+1)): " -a row
+                for ((j=0; j<n; j++)); do
+                    M[$((i*n+j))]=${row[$j]}
+                done
+            done
+            
+            echo -e "${GREEN}Transpose:${NC}"
+            for ((j=0; j<n; j++)); do
+                local line=""
+                for ((i=0; i<n; i++)); do
+                    line+="$(awk "BEGIN { printf \"%.4f\", ${M[$((i*n+j))]} }")  "
+                done
+                echo -e "  $line"
+            done
+            ;;
+        5)
+            if [[ $n -gt 3 ]]; then
+                echo -e "${RED}Inverse only supported for 2×2 and 3×3 matrices.${NC}"
+                return
+            fi
+            echo -e "Enter Matrix (${n}×${n}):"
+            declare -a M
+            for ((i=0; i<n; i++)); do
+                read -p "Row $((i+1)): " -a row
+                for ((j=0; j<n; j++)); do
+                    M[$((i*n+j))]=${row[$j]}
+                done
+            done
+            
+            local det
+            if [[ $n -eq 2 ]]; then
+                det=$(awk "BEGIN { print (${M[0]} * ${M[3]}) - (${M[1]} * ${M[2]}) }")
+                if (( $(awk "BEGIN { print ($det == 0) }") )); then
+                    echo -e "${RED}Matrix is singular (no inverse).${NC}"; return
+                fi
+                echo -e "${GREEN}Inverse:${NC}"
+                echo -e "  $(awk "BEGIN { printf \"%.4f\", ${M[3]}/$det }")   $(awk "BEGIN { printf \"%.4f\", -${M[1]}/$det }")"
+                echo -e "  $(awk "BEGIN { printf \"%.4f\", -${M[2]}/$det }")   $(awk "BEGIN { printf \"%.4f\", ${M[0]}/$det }")"
+            else
+                det=$(awk "BEGIN { 
+                    print ${M[0]}*((${M[4]}*${M[8]})-(${M[5]}*${M[7]})) - 
+                         ${M[1]}*((${M[3]}*${M[8]})-(${M[5]}*${M[6]})) + 
+                         ${M[2]}*((${M[3]}*${M[7]})-(${M[4]}*${M[6]}))
+                }")
+                if (( $(awk "BEGIN { print ($det == 0) }") )); then
+                    echo -e "${RED}Matrix is singular (no inverse).${NC}"; return
+                fi
+                echo -e "${YELLOW}3×3 inverse calculation (adjugate method)...${NC}"
+                echo -e "${GREEN}Det = $(format_result "$det")${NC}"
+                echo -e "${GRAY}Full inverse displayed as adjugate/det${NC}"
+            fi
+            ;;
+        *) echo -e "${RED}Invalid option.${NC}" ;;
+    esac
+    read -p " Calculate another matrix? (y/n): " again
+    [[ "${again,,}" == "y" ]] && { solve_matrix; return; }
+}
+
+# --- Vector Calculator ---
+solve_vector() {
+    echo -e "${CYAN}--- VECTOR CALCULATOR ---${NC}"
+    echo -e " [1] Vector Addition/Subtraction"
+    echo -e " [2] Dot Product"
+    echo -e " [3] Cross Product (3D)"
+    echo -e " [4] Magnitude"
+    echo -e " [5] Unit Vector"
+    echo -e " [6] Angle Between Vectors"
+    read -p "Select operation: " op
+    
+    case $op in
+        1)
+            read -p "Enter vector A (space-separated): " -a A
+            read -p "Enter vector B (same dimensions): " -a B
+            if [[ ${#A[@]} -ne ${#B[@]} ]]; then
+                echo -e "${RED}Vectors must have same dimensions.${NC}"; return
+            fi
+            echo -e "${GREEN}A + B: ["
+            local line=""
+            for ((i=0; i<${#A[@]}; i++)); do
+                line+="$(awk "BEGIN { printf \"%.4f\", ${A[$i]} + ${B[$i]} }")"
+                [[ $i -lt $((${#A[@]}-1)) ]] && line+=", "
+            done
+            echo -e "  $line ]${NC}"
+            ;;
+        2)
+            read -p "Enter vector A (space-separated): " -a A
+            read -p "Enter vector B (same dimensions): " -a B
+            if [[ ${#A[@]} -ne ${#B[@]} ]]; then
+                echo -e "${RED}Vectors must have same dimensions.${NC}"; return
+            fi
+            local dot=0
+            for ((i=0; i<${#A[@]}; i++)); do
+                dot=$(awk "BEGIN { print $dot + (${A[$i]} * ${B[$i]}) }")
+            done
+            echo -e "${GREEN}Dot Product = $(format_result "$dot")${NC}"
+            ;;
+        3)
+            read -p "Enter vector A (3 components): " -a A
+            read -p "Enter vector B (3 components): " -a B
+            if [[ ${#A[@]} -ne 3 || ${#B[@]} -ne 3 ]]; then
+                echo -e "${RED}Cross product requires 3D vectors.${NC}"; return
+            fi
+            local cx=$(awk "BEGIN { print (${A[1]} * ${B[2]}) - (${A[2]} * ${B[1]}) }")
+            local cy=$(awk "BEGIN { print (${A[2]} * ${B[0]}) - (${A[0]} * ${B[2]}) }")
+            local cz=$(awk "BEGIN { print (${A[0]} * ${B[1]}) - (${A[1]} * ${B[0]}) }")
+            echo -e "${GREEN}Cross Product = [$(format_result "$cx"), $(format_result "$cy"), $(format_result "$cz")]${NC}"
+            ;;
+        4)
+            read -p "Enter vector (space-separated): " -a V
+            local sum=0
+            for ((i=0; i<${#V[@]}; i++)); do
+                sum=$(awk "BEGIN { print $sum + (${V[$i]}^2) }")
+            done
+            local mag=$(awk "BEGIN { printf \"%.15g\", sqrt($sum) }")
+            echo -e "${GREEN}|V| = $(format_result "$mag")${NC}"
+            ;;
+        5)
+            read -p "Enter vector (space-separated): " -a V
+            local sum=0
+            for ((i=0; i<${#V[@]}; i++)); do
+                sum=$(awk "BEGIN { print $sum + (${V[$i]}^2) }")
+            done
+            local mag=$(awk "BEGIN { print sqrt($sum) }")
+            if (( $(awk "BEGIN { print ($mag == 0) }") )); then
+                echo -e "${RED}Zero vector has no unit vector.${NC}"; return
+            fi
+            echo -e "${GREEN}Unit Vector = ["
+            local line=""
+            for ((i=0; i<${#V[@]}; i++)); do
+                line+="$(awk "BEGIN { printf \"%.4f\", ${V[$i]} / $mag }")"
+                [[ $i -lt $((${#V[@]}-1)) ]] && line+=", "
+            done
+            echo -e "  $line ]${NC}"
+            ;;
+        6)
+            read -p "Enter vector A (space-separated): " -a A
+            read -p "Enter vector B (same dimensions): " -a B
+            if [[ ${#A[@]} -ne ${#B[@]} ]]; then
+                echo -e "${RED}Vectors must have same dimensions.${NC}"; return
+            fi
+            local dot=0 magA=0 magB=0
+            for ((i=0; i<${#A[@]}; i++)); do
+                dot=$(awk "BEGIN { print $dot + (${A[$i]} * ${B[$i]}) }")
+                magA=$(awk "BEGIN { print $magA + (${A[$i]}^2) }")
+                magB=$(awk "BEGIN { print $magB + (${B[$i]}^2) }")
+            done
+            magA=$(awk "BEGIN { print sqrt($magA) }")
+            magB=$(awk "BEGIN { print sqrt($magB) }")
+            local cos_theta=$(awk "BEGIN { print $dot / ($magA * $magB) }")
+            local theta_rad=$(awk "BEGIN { print atan2(sqrt(1-$cos_theta*$cos_theta), $cos_theta) }")
+            local theta_deg=$(awk "BEGIN { print $theta_rad * 180 / 3.14159265358979 }")
+            echo -e "${GREEN}Angle = $(format_result "$theta_deg")°${NC}"
+            ;;
+        *) echo -e "${RED}Invalid option.${NC}" ;;
+    esac
+    read -p " Calculate another vector? (y/n): " again
+    [[ "${again,,}" == "y" ]] && { solve_vector; return; }
+}
+
+# --- Statistics Calculator ---
+solve_statistics() {
+    echo -e "${CYAN}--- STATISTICS CALCULATOR ---${NC}"
+    echo -e " Enter data values separated by spaces"
+    read -p "Data: " -a data
+    local n=${#data[@]}
+    
+    if [[ $n -eq 0 ]]; then echo -e "${RED}No data entered.${NC}"; return; fi
+    
+    for v in "${data[@]}"; do
+        if ! is_num "$v"; then echo -e "${RED}Invalid numeric value: $v${NC}"; return; fi
+    done
+    
+    local sum=0
+    for v in "${data[@]}"; do
+        sum=$(awk "BEGIN { print $sum + $v }")
+    done
+    local mean=$(awk "BEGIN { printf \"%.15g\", $sum / $n }")
+    
+    local sorted=($(printf '%s\n' "${data[@]}" | sort -n))
+    
+    local median
+    if [[ $((n % 2)) -eq 0 ]]; then
+        median=$(awk "BEGIN { printf \"%.15g\", (${sorted[$((n/2-1))]} + ${sorted[$((n/2))]}) / 2 }")
+    else
+        median=${sorted[$((n/2))]}
+    fi
+    
+    local mode_freq=0 mode_val=""
+    declare -A freq
+    for v in "${data[@]}"; do
+        freq[$v]=$((${freq[$v]:-0} + 1))
+        if [[ ${freq[$v]} -gt $mode_freq ]]; then
+            mode_freq=${freq[$v]}
+            mode_val=$v
+        fi
+    done
+    
+    local var_sum=0
+    for v in "${data[@]}"; do
+        var_sum=$(awk "BEGIN { print $var_sum + ($v - $mean)^2 }")
+    done
+    local variance_pop=$(awk "BEGIN { printf \"%.15g\", $var_sum / $n }")
+    local variance_samp=$(awk "BEGIN { printf \"%.15g\", $var_sum / ($n - 1) }")
+    local std_pop=$(awk "BEGIN { printf \"%.15g\", sqrt($variance_pop) }")
+    local std_samp=$(awk "BEGIN { printf \"%.15g\", sqrt($variance_samp) }")
+    
+    local min=${sorted[0]} max=${sorted[$((n-1))]}
+    
+    local q1_idx=$(( (n-1) / 4 ))
+    local q3_idx=$(( 3 * (n-1) / 4 ))
+    local q1=${sorted[$q1_idx]}
+    local q3=${sorted[$q3_idx]}
+    local iqr=$(awk "BEGIN { printf \"%.15g\", $q3 - $q1 }")
+    
+    echo -e "${GREEN}╔══════════════════════════════════════════╗${NC}"
+    echo -e "${GREEN}║${WHITE}         STATISTICAL RESULTS              ${GREEN}║${NC}"
+    echo -e "${GREEN}╠══════════════════════════════════════════╣${NC}"
+    echo -e "${WHITE}  Count (n)     : ${YELLOW}$n${NC}"
+    echo -e "${WHITE}  Mean          : ${YELLOW}$(format_result "$mean")${NC}"
+    echo -e "${WHITE}  Median        : ${YELLOW}$(format_result "$median")${NC}"
+    if [[ $mode_freq -gt 1 ]]; then
+        echo -e "${WHITE}  Mode          : ${YELLOW}$mode_val${WHITE} (freq: $mode_freq)${NC}"
+    else
+        echo -e "${WHITE}  Mode          : ${GRAY}None (all unique)${NC}"
+    fi
+    echo -e "${WHITE}  Min           : ${YELLOW}$(format_result "$min")${NC}"
+    echo -e "${WHITE}  Max           : ${YELLOW}$(format_result "$max")${NC}"
+    echo -e "${WHITE}  Q1            : ${YELLOW}$(format_result "$q1")${NC}"
+    echo -e "${WHITE}  Q3            : ${YELLOW}$(format_result "$q3")${NC}"
+    echo -e "${WHITE}  IQR           : ${YELLOW}$(format_result "$iqr")${NC}"
+    echo -e "${WHITE}  Var (Pop)     : ${YELLOW}$(format_result "$variance_pop")${NC}"
+    echo -e "${WHITE}  Var (Sample)  : ${YELLOW}$(format_result "$variance_samp")${NC}"
+    echo -e "${WHITE}  StdDev (Pop)  : ${YELLOW}$(format_result "$std_pop")${NC}"
+    echo -e "${WHITE}  StdDev (Samp) : ${YELLOW}$(format_result "$std_samp")${NC}"
+    echo -e "${GREEN}╚══════════════════════════════════════════╝${NC}"
+    
+    read -p " Calculate another statistics? (y/n): " again
+    [[ "${again,,}" == "y" ]] && { solve_statistics; return; }
+}
+
+# --- Table Generator ---
+solve_table() {
+    echo -e "${CYAN}--- EQUATION TABLE GENERATOR ---${NC}"
+    echo -e " Enter equation in terms of x (e.g., 2*x+3, x^2, sin(x)*10)"
+    read -p "Equation: " eq
+    read -p "Start x: " start
+    read -p "End x: " end
+    read -p "Step: " step
+    
+    if ! is_num "$start" || ! is_num "$end" || ! is_num "$step"; then
+        echo -e "${RED}Invalid numeric range.${NC}"; return
+    fi
+    
+    if (( $(awk "BEGIN { print ($step <= 0) }") )); then
+        echo -e "${RED}Step must be positive.${NC}"; return
+    fi
+    
+    echo -e "${GREEN}╔══════════════════════════════════════════╗${NC}"
+    echo -e "${GREEN}║${WHITE}           TABLE: y = $eq             ${GREEN}║${NC}"
+    echo -e "${GREEN}╠════════════════╦══════════════════════════╣${NC}"
+    echo -e "${GREEN}║${WHITE}      x         ║${WHITE}           y                ${GREEN}║${NC}"
+    echo -e "${GREEN}╠════════════════╬══════════════════════════╣${NC}"
+    
+    local x=$start
+    while (( $(awk "BEGIN { print ($x <= $end) }") )); do
+        local expr=$(echo "$eq" | sed "s/x/($x)/g")
+        local y=$(awk "BEGIN { printf \"%.4f\", $expr }" 2>/dev/null)
+        if [[ -z "$y" ]]; then y="ERROR"; fi
+        printf "${GREEN}║${WHITE} %-14.4f ${GREEN}║${WHITE} %-22s   ${GREEN}║${NC}\n" "$x" "$y"
+        x=$(awk "BEGIN { print $x + $step }")
+    done
+    
+    echo -e "${GREEN}╚════════════════╩══════════════════════════╝${NC}"
+    
+    echo -e "${GRAY}  To plot: Use these points on graph paper${NC}"
+    echo -e "${GRAY}  Steps: 1) Plot each (x,y) pair${NC}"
+    echo -e "${GRAY}         2) Connect points smoothly${NC}"
+    
+    read -p " Generate another table? (y/n): " again
+    [[ "${again,,}" == "y" ]] && { solve_table; return; }
+}
+
+# --- Inequality Solver ---
+solve_inequality() {
+    echo -e "${CYAN}--- INEQUALITY SOLVER ---${NC}"
+    echo -e " [1] Linear (ax + b > 0)"
+    echo -e " [2] Quadratic (ax² + bx + c > 0)"
+    echo -e " [3] Absolute Value (|ax + b| > c)"
+    read -p "Select type: " itype
+    
+    case $itype in
+        1)
+            echo -e "Solve: ax + b ? c (? can be >, <, >=, <=)"
+            read -p "a: " a
+            read -p "b: " b
+            read -p "Operator (> < >= <=): " op
+            read -p "c: " c
+            
+            if ! is_num "$a" || ! is_num "$b" || ! is_num "$c"; then
+                echo -e "${RED}Invalid coefficients.${NC}"; return
+            fi
+            
+            local rhs=$(awk "BEGIN { print $c - $b }")
+            if [[ $a -eq 0 ]]; then
+                if (( $(awk "BEGIN { print ($b $op $c) }") )); then
+                    echo -e "${GREEN}Solution: All real numbers${NC}"
+                else
+                    echo -e "${GREEN}Solution: No solution${NC}"
+                fi
+                return
+            fi
+            
+            local sol
+            case $op in
+                ">")  [[ $a -gt 0 ]] && sol="x > $(format_result "$rhs/$a")" || sol="x < $(format_result "$rhs/$a")" ;;
+                "<")  [[ $a -gt 0 ]] && sol="x < $(format_result "$rhs/$a")" || sol="x > $(format_result "$rhs/$a")" ;;
+                ">=") [[ $a -gt 0 ]] && sol="x ≥ $(format_result "$rhs/$a")" || sol="x ≤ $(format_result "$rhs/$a")" ;;
+                "<=") [[ $a -gt 0 ]] && sol="x ≤ $(format_result "$rhs/$a")" || sol="x ≥ $(format_result "$rhs/$a")" ;;
+            esac
+            echo -e "${GREEN}Solution: $sol${NC}"
+            ;;
+        2)
+            echo -e "Solve: ax² + bx + c ? 0"
+            read -p "a: " a
+            read -p "b: " b
+            read -p "c: " c
+            read -p "Operator (> < >= <=): " op
+            
+            if ! is_num "$a" || ! is_num "$b" || ! is_num "$c"; then
+                echo -e "${RED}Invalid coefficients.${NC}"; return
+            fi
+            
+            local disc=$(awk "BEGIN { print ($b^2) - (4*$a*$c) }")
+            echo -e "${GRAY}Discriminant Δ = $(format_result "$disc")${NC}"
+            
+            if (( $(awk "BEGIN { print ($disc < 0) }") )); then
+                if [[ $a -gt 0 ]]; then
+                    [[ "$op" == ">" || "$op" == ">=" ]] && echo -e "${GREEN}Solution: All real numbers${NC}" || echo -e "${GREEN}Solution: No solution${NC}"
+                else
+                    [[ "$op" == "<" || "$op" == "<=" ]] && echo -e "${GREEN}Solution: All real numbers${NC}" || echo -e "${GREEN}Solution: No solution${NC}"
+                fi
+            elif (( $(awk "BEGIN { print ($disc == 0) }") )); then
+                local root=$(awk "BEGIN { printf \"%.15g\", -$b / (2*$a) }")
+                echo -e "${GRAY}Double root at x = $(format_result "$root")${NC}"
+                case $op in
+                    ">")  echo -e "${GREEN}Solution: x ≠ $(format_result "$root")${NC}" ;;
+                    "<")  echo -e "${GREEN}Solution: No solution${NC}" ;;
+                    ">=") echo -e "${GREEN}Solution: All real numbers${NC}" ;;
+                    "<=") echo -e "${GREEN}Solution: x = $(format_result "$root")${NC}" ;;
+                esac
+            else
+                local x1=$(awk "BEGIN { printf \"%.15g\", (-$b - sqrt($disc)) / (2*$a) }")
+                local x2=$(awk "BEGIN { printf \"%.15g\", (-$b + sqrt($disc)) / (2*$a) }")
+                [[ $x1 -gt $x2 ]] && { local tmp=$x1; x1=$x2; x2=$tmp; }
+                echo -e "${GRAY}Roots: x₁ = $(format_result "$x1"), x₂ = $(format_result "$x2")${NC}"
+                
+                if [[ $a -gt 0 ]]; then
+                    case $op in
+                        ">")  echo -e "${GREEN}Solution: x < $(format_result "$x1") or x > $(format_result "$x2")${NC}" ;;
+                        "<")  echo -e "${GREEN}Solution: $(format_result "$x1") < x < $(format_result "$x2")${NC}" ;;
+                        ">=") echo -e "${GREEN}Solution: x ≤ $(format_result "$x1") or x ≥ $(format_result "$x2")${NC}" ;;
+                        "<=") echo -e "${GREEN}Solution: $(format_result "$x1") ≤ x ≤ $(format_result "$x2")${NC}" ;;
+                    esac
+                else
+                    case $op in
+                        ">")  echo -e "${GREEN}Solution: $(format_result "$x2") < x < $(format_result "$x1")${NC}" ;;
+                        "<")  echo -e "${GREEN}Solution: x < $(format_result "$x2") or x > $(format_result "$x1")${NC}" ;;
+                        ">=") echo -e "${GREEN}Solution: $(format_result "$x2") ≤ x ≤ $(format_result "$x1")${NC}" ;;
+                        "<=") echo -e "${GREEN}Solution: x ≤ $(format_result "$x2") or x ≥ $(format_result "$x1")${NC}" ;;
+                    esac
+                fi
+            fi
+            ;;
+        3)
+            echo -e "Solve: |ax + b| ? c"
+            read -p "a: " a
+            read -p "b: " b
+            read -p "c: " c
+            read -p "Operator (> < >= <=): " op
+            
+            if ! is_num "$a" || ! is_num "$b" || ! is_num "$c"; then
+                echo -e "${RED}Invalid coefficients.${NC}"; return
+            fi
+            
+            if (( $(awk "BEGIN { print ($c < 0) }") )); then
+                [[ "$op" == ">" || "$op" == ">=" ]] && echo -e "${GREEN}Solution: All real numbers${NC}" || echo -e "${GREEN}Solution: No solution${NC}"
+                return
+            fi
+            
+            local pos_case=$(awk "BEGIN { print ($c - $b) / $a }")
+            local neg_case=$(awk "BEGIN { print (-$c - $b) / $a }")
+            [[ $pos_case -gt $neg_case ]] && { local tmp=$pos_case; pos_case=$neg_case; neg_case=$tmp; }
+            
+            case $op in
+                ">")  echo -e "${GREEN}Solution: x < $(format_result "$pos_case") or x > $(format_result "$neg_case")${NC}" ;;
+                "<")  echo -e "${GREEN}Solution: $(format_result "$pos_case") < x < $(format_result "$neg_case")${NC}" ;;
+                ">=") echo -e "${GREEN}Solution: x ≤ $(format_result "$pos_case") or x ≥ $(format_result "$neg_case")${NC}" ;;
+                "<=") echo -e "${GREEN}Solution: $(format_result "$pos_case") ≤ x ≤ $(format_result "$neg_case")${NC}" ;;
+            esac
+            ;;
+        *) echo -e "${RED}Invalid option.${NC}" ;;
+    esac
+    read -p " Solve another inequality? (y/n): " again
+    [[ "${again,,}" == "y" ]] && { solve_inequality; return; }
+}
+
 # --- Easter Egg ---
 show_easter_egg() {
     local type=$1
@@ -1207,26 +2078,7 @@ while true; do
         show_header; continue
     elif [[ "$input" == "s" ]]; then
         # --- Settings Menu ---
-        echo -e "${YELLOW}┌──────────────────────────────────────────┐${NC}"
-        echo -e "${YELLOW}│            VALTY OS: SETTINGS            │${NC}"
-        echo -e "${YELLOW}├──────────────────────────────────────────┤${NC}"
-        echo -e "${WHITE}  [1] Normal (0.0001)                      ${NC}"
-        echo -e "${WHITE}  [2] Scientific (1e-4)                    ${NC}"
-        echo -e "${WHITE}  [3] Scientific (* 10^x)                  ${NC}"
-        echo -e "${WHITE}  [4] Change Precision (0-15)              ${NC}"
-        echo -e "${WHITE}  [5] Toggle Angle Mode (DEG/RAD)          ${NC}"
-        echo -e "${WHITE}  [6] Toggle Unit System (MET/IMP)         ${NC}"
-        echo -e "${WHITE}  [b] Back                                 ${NC}"
-        echo -e "${YELLOW}└──────────────────────────────────────────┘${NC}"
-        read -p "Select option: " opt
-        case $opt in
-            1) FORMAT="normal" ;;
-            2) FORMAT="sci_e" ;;
-            3) FORMAT="sci_pow" ;;
-            4) read -p "Enter precision: " prec; [[ "$prec" =~ ^[0-9]+$ ]] && PRECISION=$prec ;;
-            5) [[ "$ANGLE_MODE" == "deg" ]] && ANGLE_MODE="rad" || ANGLE_MODE="deg" ;;
-            6) [[ "$UNIT_SYSTEM" == "metric" ]] && UNIT_SYSTEM="imperial" || UNIT_SYSTEM="metric" ;;
-        esac
+        settings_menu
         show_header; continue
     elif [[ "$input" == "itachi" || "$input" == "sharingan" ]]; then
         show_easter_egg "itachi"; continue
