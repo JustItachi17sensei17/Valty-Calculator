@@ -971,77 +971,116 @@ simplify_ratios() {
 
 # --- Equation Solver Menu ---
 show_equation_solver() {
-    echo -e "${YELLOW}┌──────────────────────────────────────────┐${NC}"
-    echo -e "${YELLOW}│${WHITE}      VALTY THANAWEYA AMMA PHYSICS OS    ${YELLOW}│${NC}"
-    echo -e "${YELLOW}├──────────────────────────────────────────┤${NC}"
-    echo -e "  [1] CH1: DC Circuits (Ohm/Req)          "
-    echo -e "  [2] CH2: Magnetism & Force              "
-    echo -e "  [3] CH3: Induction & Dynamo             "
-    echo -e "  [4] CH4: AC Circuits (Z/Resonance)      "
-    echo -e "  [5] CH5-8: Modern & Electronics         "
-    echo -e "${YELLOW}├──────────────────────────────────────────┤${NC}"
-    echo -e "  [P] Polynomial (Linear/Quad)            "
-    echo -e "  [S] Simultaneous (2-3 Unknowns)         "
-    echo -e "  [R] Ratios & Proportions                "
-    echo -e "  [C] Complex Numbers                     "
-    echo -e "  [N] Base-N Converter                    "
-    echo -e "  [M] Matrix Calculator                   "
-    echo -e "  [V] Vector Calculator                   "
-    echo -e "  [T] Statistics                          "
-    echo -e "  [B] Table Generator                     "
-    echo -e "  [I] Inequality Solver                   "
-    echo -e "  [X] Variable Manager                    "
-    echo -e "  [E] Equation Solver (ax+b=c)            "
-    echo -e "  [b] Back to Main OS                     "
-    echo -e "${YELLOW}└──────────────────────────────────────────┘${NC}"
-    read -p "Select option: " type
-    [[ "$type" == "b" ]] && { show_header; return; }
+    while true; do
+        clear
+        echo -e "${YELLOW}┌──────────────────────────────────────────┐${NC}"
+        echo -e "${YELLOW}│${WHITE}      VALTY EQUATIONS MENU             ${YELLOW}│${NC}"
+        echo -e "${YELLOW}├──────────────────────────────────────────┤${NC}"
+        echo -e "  [1] General Solver (Linear/Quadratic)     "
+        echo -e "  [2] Physics Solver                        "
+        echo -e "  [3] Chemistry Solver                      "
+        echo -e "  [4] Biology Solver                        "
+        echo -e "${YELLOW}├──────────────────────────────────────────┤${NC}"
+        echo -e "  [5] Simultaneous (2-3 Unknowns)           "
+        echo -e "  [6] Ratios & Proportions                  "
+        echo -e "  [7] Complex Numbers                       "
+        echo -e "  [8] Base-N Converter                      "
+        echo -e "  [9] Matrix Calculator                     "
+        echo -e "  [0] Vector Calculator                     "
+        echo -e "  [S] Statistics                            "
+        echo -e "  [T] Table Generator                       "
+        echo -e "  [I] Inequality Solver                     "
+        echo -e "  [V] Variable Manager                      "
+        echo -e "${YELLOW}├──────────────────────────────────────────┤${NC}"
+        echo -e "  [b] Back to Main Menu                     "
+        echo -e "${YELLOW}└──────────────────────────────────────────┘${NC}"
+        read -p "Select option: " type
+        [[ "$type" == "b" ]] && { show_header; return; }
 
-    case ${type^^} in
-        1) solve_ch1 ;;
-        2) solve_ch2 ;;
-        3) solve_ch3 ;;
-        4) solve_ch4 ;;
-        5) solve_modern ;;
-        P) 
-           echo -e " [1] Linear (ax+b=c) [2] Quadratic (ax2+bx+c=0)"
-           read -p "Type: " pt
-           if [[ "$pt" == "1" ]]; then
-                read -p "a: " a; read -p "b: " b; read -p "c: " c
-                if ! is_num "$a" || ! is_num "$b" || ! is_num "$c"; then echo -e "${RED}Invalid input.${NC}"; else
-                    local x=$(awk "BEGIN { printf \"%.15g\", ($c - $b) / $a }")
-                    echo -e "${GREEN}Solution: x = $(format_result "$x")${NC}"
-                fi
-           else
-                read -p "a: " a; read -p "b: " b; read -p "c: " c
-                if ! is_num "$a" || ! is_num "$b" || ! is_num "$c"; then echo -e "${RED}Invalid input.${NC}"; else
-                    local d=$(awk "BEGIN { print ($b^2) - (4*$a*$c) }")
-                    if (( $(awk "BEGIN { print ($d < 0) }") )); then echo -e "${RED}No real roots.${NC}"
+        case ${type^^} in
+            1) 
+                echo -e " [1] Linear (ax+b=c) [2] Quadratic (ax²+bx+c=0)"
+                read -p "Type: " pt
+                if [[ "$pt" == "1" ]]; then
+                    read -p "a: " a; read -p "b: " b; read -p "c: " c
+                    if ! is_num "$a" || ! is_num "$b" || ! is_num "$c"; then 
+                        echo -e "${RED}Invalid input.${NC}"
+                    elif [[ "$a" == "0" ]]; then
+                        echo -e "${RED}Error: 'a' cannot be zero.${NC}"
                     else
-                        local x1=$(awk "BEGIN { printf \"%.15g\", (-$b + sqrt($d)) / (2*$a) }")
-                        local x2=$(awk "BEGIN { printf \"%.15g\", (-$b - sqrt($d)) / (2*$a) }")
-                        echo -e "${GREEN}x1 = $(format_result "$x1"), x2 = $(format_result "$x2")${NC}"
+                        local x=$(awk "BEGIN { printf \"%.15g\", ($c - $b) / $a }")
+                        echo -e "${GREEN}Solution: x = $(format_result "$x")${NC}"
+                    fi
+                else
+                    read -p "a: " a; read -p "b: " b; read -p "c: " c
+                    if ! is_num "$a" || ! is_num "$b" || ! is_num "$c"; then 
+                        echo -e "${RED}Invalid input.${NC}"
+                    elif [[ "$a" == "0" ]]; then
+                        echo -e "${RED}Error: 'a' cannot be zero for quadratic.${NC}"
+                    else
+                        local d=$(awk "BEGIN { print ($b^2) - (4*$a*$c) }")
+                        if (( $(awk "BEGIN { print ($d < 0) }") )); then 
+                            echo -e "${RED}No real roots (discriminant = $d).${NC}"
+                        else
+                            local x1=$(awk "BEGIN { printf \"%.15g\", (-$b + sqrt($d)) / (2*$a) }")
+                            local x2=$(awk "BEGIN { printf \"%.15g\", (-$b - sqrt($d)) / (2*$a) }")
+                            echo -e "${GREEN}x₁ = $(format_result "$x1"), x₂ = $(format_result "$x2")${NC}"
+                        fi
                     fi
                 fi
-           fi ;;
-        S) solve_simul ;;
-        R) 
-           echo -e " [1] Proportional Solver (a/b = c/d) [2] Ratio Simplifier"
-           read -p "Select: " rt
-           if [[ "$rt" == "1" ]]; then solve_ratios; else simplify_ratios; fi ;;
-        C) solve_complex ;;
-        N) solve_base_n ;;
-        M) solve_matrix ;;
-        V) solve_vector ;;
-        T) solve_statistics ;;
-        B) solve_table ;;
-        I) solve_inequality ;;
-        X) manage_variables ;;
-        E) solve_equation ;;
-        *) echo -e "${RED}Invalid option.${NC}" ;;
-    esac
-    read -p "Press any key to continue..." -n1 -s
-    show_equation_solver
+                ;;
+            2) show_physics_solver ;;
+            3) chemistry_solver ;;
+            4) biology_solver ;;
+            5) solve_simul ;;
+            6) 
+               echo -e " [1] Proportional Solver (a/b = c/d) [2] Ratio Simplifier"
+               read -p "Select: " rt
+               if [[ "$rt" == "1" ]]; then solve_ratios; else simplify_ratios; fi ;;
+            7) solve_complex ;;
+            8) solve_base_n ;;
+            9) solve_matrix ;;
+            0) solve_vector ;;
+            S) solve_statistics ;;
+            T) solve_table ;;
+            I) solve_inequality ;;
+            V) manage_variables ;;
+            *) echo -e "${RED}Invalid option.${NC}" ;;
+        esac
+        read -p "Press Enter to continue..." -n1 -s
+        echo ""
+    done
+}
+
+# --- Physics Solver Menu ---
+show_physics_solver() {
+    while true; do
+        clear
+        echo -e "${CYAN}┌──────────────────────────────────────────┐${NC}"
+        echo -e "${CYAN}│${WHITE}         PHYSICS SOLVER                 ${CYAN}│${NC}"
+        echo -e "${CYAN}├──────────────────────────────────────────┤${NC}"
+        echo -e "  [1] CH1: DC Circuits (Ohm/Req)            "
+        echo -e "  [2] CH2: Magnetism & Force                "
+        echo -e "  [3] CH3: Induction & Dynamo               "
+        echo -e "  [4] CH4: AC Circuits (Z/Resonance)        "
+        echo -e "  [5] CH5-8: Modern & Electronics           "
+        echo -e "${CYAN}├──────────────────────────────────────────┤${NC}"
+        echo -e "  [b] Back to Equations Menu                "
+        echo -e "${CYAN}└──────────────────────────────────────────┘${NC}"
+        read -p "Select option: " ptype
+        [[ "$ptype" == "b" ]] && { return; }
+
+        case ${ptype^^} in
+            1) solve_ch1 ;;
+            2) solve_ch2 ;;
+            3) solve_ch3 ;;
+            4) solve_ch4 ;;
+            5) solve_modern ;;
+            *) echo -e "${RED}Invalid option.${NC}" ;;
+        esac
+        read -p "Press Enter to continue..." -n1 -s
+        echo ""
+    done
 }
 
 # --- History Menu ---
@@ -1184,19 +1223,59 @@ declare -A ATOMIC_MASSES=(
     ["Rf"]=267 ["Db"]=268 ["Sg"]=271 ["Bh"]=272 ["Hs"]=270 ["Mt"]=276 ["Ds"]=281 ["Rg"]=280 ["Cn"]=285 ["Nh"]=284 ["Fl"]=289 ["Mc"]=288 ["Lv"]=293 ["Ts"]=294 ["Og"]=294
 )
 
-# Function to parse chemical formula and calculate molar mass
+# Function to parse chemical formula and calculate molar mass (with parentheses support)
 calculate_molar_mass() {
     local formula="$1"
     local total_mass=0
+    
+    # Remove all spaces
+    formula=$(echo "$formula" | tr -d ' ')
+    
+    # Validate formula contains at least one uppercase letter
+    if [[ ! "$formula" =~ [A-Z] ]]; then
+        echo "Error: Invalid formula. Must contain element symbols." >&2
+        return 1
+    fi
+    
+    # Expand parentheses recursively (handles nested parentheses)
+    local expanded="$formula"
+    local max_iterations=10
+    local iteration=0
+    
+    while [[ "$expanded" =~ \(([^()]+)\)([0-9]+) ]] && [[ $iteration -lt $max_iterations ]]; do
+        local inner="${BASH_REMATCH[1]}"
+        local multiplier="${BASH_REMATCH[2]}"
+        
+        # Expand each element in the parentheses
+        local new_inner=""
+        local temp="$inner"
+        
+        # Parse elements inside parentheses and multiply counts
+        while [[ "$temp" =~ ([A-Z][a-z]?)([0-9]*) ]]; do
+            local elem="${BASH_REMATCH[1]}"
+            local count="${BASH_REMATCH[2]:-1}"
+            local new_count=$((count * multiplier))
+            new_inner+="${elem}${new_count}"
+            # Remove matched portion from temp
+            temp="${temp#"${BASH_REMATCH[0]}"}"
+        done
+        
+        # Replace the parenthetical group with expanded version
+        expanded="${expanded/\(${inner}\)${multiplier}/${new_inner}}"
+        ((iteration++))
+    done
+    
+    # Now parse the expanded formula
     local current_element=""
     local current_count=""
-    local len=${#formula}
+    local len=${#expanded}
     local i=0
     
     while [ $i -lt $len ]; do
-        char="${formula:$i:1}"
+        local char="${expanded:$i:1}"
         
         if [[ "$char" =~ [A-Z] ]]; then
+            # Process previous element if exists
             if [ -n "$current_element" ]; then
                 local count=${current_count:-1}
                 local mass=${ATOMIC_MASSES[$current_element]}
@@ -1217,6 +1296,7 @@ calculate_molar_mass() {
         ((i++))
     done
     
+    # Process last element
     if [ -n "$current_element" ]; then
         local count=${current_count:-1}
         local mass=${ATOMIC_MASSES[$current_element]}
@@ -1242,7 +1322,8 @@ chemistry_solver() {
         echo "[4] pH / pOH Calculator"
         echo "[5] Dilution Calculator (C1V1=C2V2)"
         echo "[6] Half-Life / Decay"
-        echo "[0] Back to Settings"
+        echo "[7] Periodic Table Viewer"
+        echo "[0] Back to Equations Menu"
         echo "------------------------------------------"
         read -p "Select Option: " chem_choice
 
@@ -1250,14 +1331,22 @@ chemistry_solver() {
             1)
                 clear
                 echo "--- Molar Mass Calculator ---"
-                echo "Enter chemical formula (e.g., H2O, CO2, NaCl):"
+                echo "Enter chemical formula (e.g., H2O, CO2, Ca(NO3)2):"
                 read -p "Formula: " formula
                 formula=$(echo "$formula" | sed 's/ //g')
+                
+                # Validate formula contains at least one uppercase letter
+                if [[ ! "$formula" =~ [A-Z] ]]; then
+                    echo "Error: Invalid formula. Must contain element symbols."
+                    read -p "Press Enter to continue..."
+                    continue
+                fi
+                
                 mass=$(calculate_molar_mass "$formula")
                 if [ $? -eq 0 ]; then
                     echo "Molar Mass of $formula is: $mass g/mol"
                 else
-                    echo "Calculation failed."
+                    echo "Calculation failed. Check formula syntax."
                 fi
                 read -p "Press Enter to continue..."
                 ;;
@@ -1269,14 +1358,23 @@ chemistry_solver() {
                 read -p "Coefficient of A: " coef_a
                 read -p "Coefficient of B: " coef_b
                 read -p "Molar Mass of B (0 for moles only): " mm_b
-                if [ "$mm_a" == "0" ] || [ "$coef_a" == "0" ]; then
-                    echo "Error: Zero values not allowed."
+                
+                # Input validation
+                if ! is_num "$mass_a" || ! is_num "$mm_a" || ! is_num "$coef_a" || ! is_num "$coef_b"; then
+                    echo "Error: Invalid numeric input."
                     read -p "Press Enter..."
                     continue
                 fi
+                
+                if [[ "$mm_a" == "0" ]] || [[ "$coef_a" == "0" ]]; then
+                    echo "Error: Zero values not allowed for molar mass or coefficient A."
+                    read -p "Press Enter..."
+                    continue
+                fi
+                
                 moles_a=$(echo "$mass_a / $mm_a" | bc -l)
                 moles_b=$(echo "$moles_a * ($coef_b / $coef_a)" | bc -l)
-                if [ "$mm_b" != "0" ]; then
+                if [[ "$mm_b" != "0" ]] && is_num "$mm_b"; then
                     mass_b=$(echo "$moles_b * $mm_b" | bc -l)
                     printf "Result: %.4f moles, %.4f g of B\n" "$moles_b" "$mass_b"
                 else
@@ -1289,12 +1387,55 @@ chemistry_solver() {
                 echo "--- Ideal Gas Law (PV = nRT) ---"
                 echo "1) Pressure  2) Volume  3) Moles  4) Temperature"
                 read -p "Choice: " gas_choice
-                read -p "R (default 0.0821): " R_val; R_val=${R_val:-0.0821}
+                read -p "R (default 0.0821 L·atm/(mol·K)): " R_val
+                R_val=${R_val:-0.0821}
+                
                 case $gas_choice in
-                    1) read -p "n, T(K), V(L): " n T V; res=$(echo "($n*$R_val*$T)/$V" | bc -l); echo "P = $res atm" ;;
-                    2) read -p "n, T(K), P(atm): " n T P; res=$(echo "($n*$R_val*$T)/$P" | bc -l); echo "V = $res L" ;;
-                    3) read -p "P(atm), V(L), T(K): " P V T; res=$(echo "($P*$V)/($R_val*$T)" | bc -l); echo "n = $res mol" ;;
-                    4) read -p "P(atm), V(L), n: " P V n; res=$(echo "($P*$V)/($n*$R_val)" | bc -l); echo "T = $res K" ;;
+                    1) 
+                        read -p "n (mol): " n
+                        read -p "T (K): " T
+                        read -p "V (L): " V
+                        if ! is_num "$n" || ! is_num "$T" || ! is_num "$V" || [[ "$V" == "0" ]]; then
+                            echo "Error: Invalid input or division by zero."
+                        else
+                            res=$(echo "scale=6; ($n*$R_val*$T)/$V" | bc -l)
+                            echo "P = $res atm"
+                        fi
+                        ;;
+                    2) 
+                        read -p "n (mol): " n
+                        read -p "T (K): " T
+                        read -p "P (atm): " P
+                        if ! is_num "$n" || ! is_num "$T" || ! is_num "$P" || [[ "$P" == "0" ]]; then
+                            echo "Error: Invalid input or division by zero."
+                        else
+                            res=$(echo "scale=6; ($n*$R_val*$T)/$P" | bc -l)
+                            echo "V = $res L"
+                        fi
+                        ;;
+                    3) 
+                        read -p "P (atm): " P
+                        read -p "V (L): " V
+                        read -p "T (K): " T
+                        if ! is_num "$P" || ! is_num "$V" || ! is_num "$T" || [[ "$T" == "0" ]]; then
+                            echo "Error: Invalid input or division by zero."
+                        else
+                            res=$(echo "scale=6; ($P*$V)/($R_val*$T)" | bc -l)
+                            echo "n = $res mol"
+                        fi
+                        ;;
+                    4) 
+                        read -p "P (atm): " P
+                        read -p "V (L): " V
+                        read -p "n (mol): " n
+                        if ! is_num "$P" || ! is_num "$V" || ! is_num "$n" || [[ "$n" == "0" ]]; then
+                            echo "Error: Invalid input or division by zero."
+                        else
+                            res=$(echo "scale=6; ($P*$V)/($n*$R_val)" | bc -l)
+                            echo "T = $res K"
+                        fi
+                        ;;
+                    *) echo "Invalid choice." ;;
                 esac
                 read -p "Press Enter to continue..."
                 ;;
@@ -1304,40 +1445,141 @@ chemistry_solver() {
                 echo "1) pH from [H+]  2) [H+] from pH  3) pOH from [OH-]  4) pH from pOH"
                 read -p "Choice: " ph_choice
                 case $ph_choice in
-                    1) read -p "[H+]: " c; res=$(echo "scale=4; -l($c)/l(10)" | bc -l); echo "pH = $res" ;;
-                    2) read -p "pH: " p; res=$(echo "scale=4; 10^(-$p)" | bc -l); echo "[H+] = $res M" ;;
-                    3) read -p "[OH-]: " c; res=$(echo "scale=4; -l($c)/l(10)" | bc -l); echo "pOH = $res" ;;
-                    4) read -p "pOH: " p; res=$(echo "scale=4; 14-$p" | bc -l); echo "pH = $res" ;;
+                    1) 
+                        read -p "[H+] (M): " c
+                        if ! is_num "$c" || (( $(awk "BEGIN {print ($c <= 0)}") )); then
+                            echo "Error: Concentration must be positive."
+                        else
+                            res=$(echo "scale=4; -l($c)/l(10)" | bc -l)
+                            echo "pH = $res"
+                        fi
+                        ;;
+                    2) 
+                        read -p "pH: " p
+                        if ! is_num "$p"; then
+                            echo "Error: Invalid pH value."
+                        else
+                            res=$(echo "scale=6; 10^(-$p)" | bc -l)
+                            echo "[H+] = $res M"
+                        fi
+                        ;;
+                    3) 
+                        read -p "[OH-] (M): " c
+                        if ! is_num "$c" || (( $(awk "BEGIN {print ($c <= 0)}") )); then
+                            echo "Error: Concentration must be positive."
+                        else
+                            res=$(echo "scale=4; -l($c)/l(10)" | bc -l)
+                            echo "pOH = $res"
+                        fi
+                        ;;
+                    4) 
+                        read -p "pOH: " p
+                        if ! is_num "$p"; then
+                            echo "Error: Invalid pOH value."
+                        else
+                            res=$(echo "scale=4; 14-$p" | bc -l)
+                            echo "pH = $res"
+                        fi
+                        ;;
+                    *) echo "Invalid choice." ;;
                 esac
                 read -p "Press Enter to continue..."
                 ;;
             5)
                 clear
                 echo "--- Dilution (C1V1=C2V2) ---"
-                echo "Leave unknown blank"
-                read -p "C1: " c1; read -p "V1: " v1; read -p "C2: " c2; read -p "V2: " v2
-                if [ -z "$c1" ]; then res=$(echo "($c2*$v2)/$v1" | bc -l); echo "C1 = $res"
-                elif [ -z "$v1" ]; then res=$(echo "($c2*$v2)/$c1" | bc -l); echo "V1 = $res"
-                elif [ -z "$c2" ]; then res=$(echo "($c1*$v1)/$v2" | bc -l); echo "C2 = $res"
-                elif [ -z "$v2" ]; then res=$(echo "($c1*$v1)/$c2" | bc -l); echo "V2 = $res"
-                else echo "All given: C1V1=$(echo "$c1*$v1"|bc), C2V2=$(echo "$c2*$v2"|bc)"; fi
+                echo "Leave unknown blank. Enter values for known quantities."
+                read -p "C1 (initial concentration): " c1
+                read -p "V1 (initial volume): " v1
+                read -p "C2 (final concentration): " c2
+                read -p "V2 (final volume): " v2
+                
+                if [ -z "$c1" ]; then
+                    if [[ "$v1" == "0" ]]; then echo "Error: V1 cannot be zero."; else
+                        res=$(echo "scale=6; ($c2*$v2)/$v1" | bc -l)
+                        echo "C1 = $res"
+                    fi
+                elif [ -z "$v1" ]; then
+                    if [[ "$c1" == "0" ]]; then echo "Error: C1 cannot be zero."; else
+                        res=$(echo "scale=6; ($c2*$v2)/$c1" | bc -l)
+                        echo "V1 = $res"
+                    fi
+                elif [ -z "$c2" ]; then
+                    if [[ "$v2" == "0" ]]; then echo "Error: V2 cannot be zero."; else
+                        res=$(echo "scale=6; ($c1*$v1)/$v2" | bc -l)
+                        echo "C2 = $res"
+                    fi
+                elif [ -z "$v2" ]; then
+                    if [[ "$c1" == "0" ]]; then echo "Error: C1 cannot be zero."; else
+                        res=$(echo "scale=6; ($c1*$v1)/$c2" | bc -l)
+                        echo "V2 = $res"
+                    fi
+                else
+                    echo "All values provided. Checking equation balance:"
+                    left=$(echo "$c1*$v1" | bc -l)
+                    right=$(echo "$c2*$v2" | bc -l)
+                    echo "C1V1 = $left, C2V2 = $right"
+                fi
                 read -p "Press Enter to continue..."
                 ;;
             6)
                 clear
-                echo "--- Half-Life ---"
-                echo "1) N(t)  2) N0  3) Time  4) Half-life"
+                echo "--- Half-Life / Radioactive Decay ---"
+                echo "1) N(t) - Remaining amount  2) N0 - Initial amount"
+                echo "3) Time elapsed  4) Half-life"
                 read -p "Choice: " hl_choice
                 case $hl_choice in
-                    1) read -p "N0, t_half, t: " n0 th t; res=$(echo "$n0*(0.5^($t/$th))" | bc -l); echo "N(t) = $res" ;;
-                    2) read -p "Nt, t_half, t: " nt th t; res=$(echo "$nt/(0.5^($t/$th))" | bc -l); echo "N0 = $res" ;;
-                    3) read -p "N0, Nt, t_half: " n0 nt th; res=$(echo "$th*l($nt/$n0)/l(0.5)" | bc -l); echo "t = $res" ;;
-                    4) read -p "N0, Nt, t: " n0 nt t; res=$(echo "$t*l(0.5)/l($nt/$n0)" | bc -l); echo "t_half = $res" ;;
+                    1) 
+                        read -p "N0 (initial): " n0
+                        read -p "t_half: " th
+                        read -p "t (time elapsed): " t
+                        if ! is_num "$n0" || ! is_num "$th" || ! is_num "$t" || [[ "$th" == "0" ]]; then
+                            echo "Error: Invalid input."
+                        else
+                            res=$(echo "scale=6; $n0*(0.5^($t/$th))" | bc -l)
+                            echo "N(t) = $res"
+                        fi
+                        ;;
+                    2) 
+                        read -p "Nt (remaining): " nt
+                        read -p "t_half: " th
+                        read -p "t (time elapsed): " t
+                        if ! is_num "$nt" || ! is_num "$th" || ! is_num "$t" || [[ "$th" == "0" ]]; then
+                            echo "Error: Invalid input."
+                        else
+                            res=$(echo "scale=6; $nt/(0.5^($t/$th))" | bc -l)
+                            echo "N0 = $res"
+                        fi
+                        ;;
+                    3) 
+                        read -p "N0 (initial): " n0
+                        read -p "Nt (remaining): " nt
+                        read -p "t_half: " th
+                        if ! is_num "$n0" || ! is_num "$nt" || ! is_num "$th" || [[ "$n0" == "0" ]] || [[ "$nt" == "0" ]]; then
+                            echo "Error: Invalid input or zero values."
+                        else
+                            res=$(echo "scale=6; $th*l($nt/$n0)/l(0.5)" | bc -l)
+                            echo "t = $res"
+                        fi
+                        ;;
+                    4) 
+                        read -p "N0 (initial): " n0
+                        read -p "Nt (remaining): " nt
+                        read -p "t (time elapsed): " t
+                        if ! is_num "$n0" || ! is_num "$nt" || ! is_num "$t" || [[ "$n0" == "0" ]] || [[ "$nt" == "0" ]]; then
+                            echo "Error: Invalid input or zero values."
+                        else
+                            res=$(echo "scale=6; $t*l(0.5)/l($nt/$n0)" | bc -l)
+                            echo "t_half = $res"
+                        fi
+                        ;;
+                    *) echo "Invalid choice." ;;
                 esac
                 read -p "Press Enter to continue..."
                 ;;
+            7) periodic_table_viewer ;;
             0) return ;;
-            *) echo "Invalid"; sleep 1 ;;
+            *) echo "Invalid option."; sleep 1 ;;
         esac
     done
 }
@@ -1351,55 +1593,242 @@ biology_solver() {
         echo "[1] Population Growth"
         echo "[2] Microscopy Mag/FOV"
         echo "[3] BMI Calculator"
-        echo "[4] DNA Complement"
+        echo "[4] DNA Tools (Complement/RNA)"
         echo "[5] Q10 Coefficient"
-        echo "[0] Back to Settings"
+        echo "[0] Back to Equations Menu"
         echo "------------------------------------------"
         read -p "Select Option: " bio_choice
+        
         case $bio_choice in
             1)
-                clear; echo "--- Population Growth (Nt=N0*e^(rt)) ---"
-                read -p "N0: " n0; read -p "r: " r; read -p "t: " t
-                res=$(echo "$n0*e($r*$t)" | bc -l)
-                printf "Population: %.2f\n" "$res"
-                read -p "Press Enter..." ;;
+                clear
+                echo "--- Population Growth (Nt=N0*e^(rt)) ---"
+                echo "Solve for: [1] Nt (Final)  [2] N0 (Initial)  [3] r (Rate)  [4] t (Time)"
+                read -p "Choice: " pg_choice
+                case $pg_choice in
+                    1)
+                        read -p "N0 (initial population): " n0
+                        read -p "r (growth rate): " r
+                        read -p "t (time): " t
+                        if ! is_num "$n0" || ! is_num "$r" || ! is_num "$t"; then
+                            echo "Error: Invalid numeric input."
+                        else
+                            res=$(echo "scale=6; $n0*e($r*$t)" | bc -l)
+                            printf "Final Population: %.2f\n" "$res"
+                        fi
+                        ;;
+                    2)
+                        read -p "Nt (final population): " nt
+                        read -p "r (growth rate): " r
+                        read -p "t (time): " t
+                        if ! is_num "$nt" || ! is_num "$r" || ! is_num "$t"; then
+                            echo "Error: Invalid numeric input."
+                        else
+                            res=$(echo "scale=6; $nt/e($r*$t)" | bc -l)
+                            printf "Initial Population: %.2f\n" "$res"
+                        fi
+                        ;;
+                    3)
+                        read -p "N0 (initial): " n0
+                        read -p "Nt (final): " nt
+                        read -p "t (time): " t
+                        if ! is_num "$n0" || ! is_num "$nt" || ! is_num "$t" || [[ "$n0" == "0" ]] || [[ "$t" == "0" ]]; then
+                            echo "Error: Invalid input or zero values."
+                        else
+                            res=$(echo "scale=6; l($nt/$n0)/$t" | bc -l)
+                            printf "Growth Rate (r): %.6f\n" "$res"
+                        fi
+                        ;;
+                    4)
+                        read -p "N0 (initial): " n0
+                        read -p "Nt (final): " nt
+                        read -p "r (growth rate): " r
+                        if ! is_num "$n0" || ! is_num "$nt" || ! is_num "$r" || [[ "$n0" == "0" ]] || [[ "$r" == "0" ]]; then
+                            echo "Error: Invalid input or zero values."
+                        else
+                            res=$(echo "scale=6; l($nt/$n0)/$r" | bc -l)
+                            printf "Time (t): %.2f\n" "$res"
+                        fi
+                        ;;
+                    *) echo "Invalid choice." ;;
+                esac
+                read -p "Press Enter to continue..."
+                ;;
             2)
-                clear; echo "--- Microscopy ---"
-                echo "1) Magnification  2) FOV"
+                clear
+                echo "--- Microscopy ---"
+                echo "1) Magnification  2) Field of View (FOV)"
                 read -p "Choice: " mc
                 if [ "$mc" == "1" ]; then
-                    read -p "Ocular: " oc; read -p "Objective: " obj
-                    echo "Total Mag: $(($oc*$obj))x"
+                    read -p "Ocular magnification: " oc
+                    read -p "Objective magnification: " obj
+                    if ! is_num "$oc" || ! is_num "$obj"; then
+                        echo "Error: Invalid input."
+                    else
+                        echo "Total Magnification: $(($oc*$obj))x"
+                    fi
                 else
-                    read -p "Known FOV: " fl; read -p "Known Mag: " ml; read -p "New Mag: " mn
-                    res=$(echo "$fl*($ml/$mn)" | bc -l)
-                    echo "New FOV: $res"
+                    read -p "Known FOV (um): " fl
+                    read -p "Known Magnification: " ml
+                    read -p "New Magnification: " mn
+                    if ! is_num "$fl" || ! is_num "$ml" || ! is_num "$mn" || [[ "$mn" == "0" ]]; then
+                        echo "Error: Invalid input or division by zero."
+                    else
+                        res=$(echo "scale=4; $fl*($ml/$mn)" | bc -l)
+                        echo "New FOV: $res um"
+                    fi
                 fi
-                read -p "Press Enter..." ;;
+                read -p "Press Enter to continue..."
+                ;;
             3)
-                clear; echo "--- BMI ---"
-                echo "1) Metric  2) Imperial"
+                clear
+                echo "--- BMI Calculator ---"
+                echo "1) Metric (kg/m)  2) Imperial (lbs/in)"
                 read -p "System: " sys
-                if [ "$sys" == "1" ]; then read -p "kg: " w; read -p "m: " h; res=$(echo "$w/($h*$h)" | bc -l)
-                else read -p "lbs: " w; read -p "in: " h; res=$(echo "703*$w/($h*$h)" | bc -l); fi
-                printf "BMI: %.2f\n" "$res"
-                read -p "Press Enter..." ;;
+                if [ "$sys" == "1" ]; then
+                    read -p "Weight (kg): " w
+                    read -p "Height (m): " h
+                    if ! is_num "$w" || ! is_num "$h" || [[ "$h" == "0" ]]; then
+                        echo "Error: Invalid input."
+                    else
+                        res=$(echo "scale=4; $w/($h*$h)" | bc -l)
+                        bmi_category "$res"
+                    fi
+                elif [ "$sys" == "2" ]; then
+                    read -p "Weight (lbs): " w
+                    read -p "Height (inches): " h
+                    if ! is_num "$w" || ! is_num "$h" || [[ "$h" == "0" ]]; then
+                        echo "Error: Invalid input."
+                    else
+                        res=$(echo "scale=4; 703*$w/($h*$h)" | bc -l)
+                        bmi_category "$res"
+                    fi
+                else
+                    echo "Invalid system choice."
+                fi
+                read -p "Press Enter to continue..."
+                ;;
             4)
-                clear; echo "--- DNA Complement ---"
-                read -p "Sequence: " seq; seq=$(echo "$seq" | tr 'a-z' 'A-Z')
-                comp=""; for ((i=0;i<${#seq};i++)); do b="${seq:$i:1}"; case $b in A)comp+="T";;T)comp+="A";;C)comp+="G";;G)comp+="C";;*)comp+="$b";;esac; done
-                echo "Original: $seq"; echo "Complement: $comp"
-                read -p "Press Enter..." ;;
+                clear
+                echo "--- DNA/RNA Tools ---"
+                echo "1) DNA Complement  2) RNA Transcription (DNA->mRNA)"
+                read -p "Choice: " dna_choice
+                if [ "$dna_choice" == "1" ]; then
+                    read -p "DNA Sequence: " seq
+                    seq=$(echo "$seq" | tr 'a-z' 'A-Z' | tr -d ' ')
+                    comp=""
+                    for ((i=0;i<${#seq};i++)); do
+                        b="${seq:$i:1}"
+                        case $b in
+                            A)comp+="T";; T)comp+="A";; C)comp+="G";; G)comp+="C";;
+                            *)comp+="$b";;
+                        esac
+                    done
+                    echo "Original:   $seq"
+                    echo "Complement: $comp"
+                elif [ "$dna_choice" == "2" ]; then
+                    read -p "DNA Template Strand: " seq
+                    seq=$(echo "$seq" | tr 'a-z' 'A-Z' | tr -d ' ')
+                    mrna=""
+                    for ((i=0;i<${#seq};i++)); do
+                        b="${seq:$i:1}"
+                        case $b in
+                            A)mrna+="U";; T)mrna+="A";; C)mrna+="G";; G)mrna+="C";;
+                            *)mrna+="$b";;
+                        esac
+                    done
+                    echo "DNA:  $seq"
+                    echo "mRNA: $mrna"
+                    echo ""
+                    echo "Translation (codons -> amino acids):"
+                    translate_codons "$mrna"
+                else
+                    echo "Invalid choice."
+                fi
+                read -p "Press Enter to continue..."
+                ;;
             5)
-                clear; echo "--- Q10 ---"
-                read -p "R1: " r1; read -p "R2: " r2; read -p "T1: " t1; read -p "T2: " t2
-                diff=$(echo "$t2-$t1" | bc -l)
-                if [ "$diff" != "0" ]; then exp=$(echo "10/$diff" | bc -l); ratio=$(echo "$r2/$r1" | bc -l); res=$(echo "e($exp*l($ratio))" | bc -l); echo "Q10 = $res"; fi
-                read -p "Press Enter..." ;;
+                clear
+                echo "--- Q10 Temperature Coefficient ---"
+                read -p "R1 (rate at T1): " r1
+                read -p "R2 (rate at T2): " r2
+                read -p "T1 (temperature): " t1
+                read -p "T2 (temperature): " t2
+                if ! is_num "$r1" || ! is_num "$r2" || ! is_num "$t1" || ! is_num "$t2"; then
+                    echo "Error: Invalid numeric input."
+                else
+                    diff=$(echo "$t2-$t1" | bc -l)
+                    if [[ "$diff" != "0" ]] && (( $(awk "BEGIN {print ($r1 > 0 && $r2 > 0)}") )); then
+                        exp=$(echo "scale=6; 10/$diff" | bc -l)
+                        ratio=$(echo "scale=6; $r2/$r1" | bc -l)
+                        res=$(echo "scale=6; e($exp*l($ratio))" | bc -l)
+                        echo "Q10 = $res"
+                    else
+                        echo "Error: Temperature difference cannot be zero, rates must be positive."
+                    fi
+                fi
+                read -p "Press Enter to continue..."
+                ;;
             0) return ;;
-            *) echo "Invalid"; sleep 1 ;;
+            *) echo "Invalid option."; sleep 1 ;;
         esac
     done
+}
+
+# Helper function for BMI category
+bmi_category() {
+    local bmi=$1
+    printf "BMI: %.2f - " "$bmi"
+    if (( $(awk "BEGIN {print ($bmi < 18.5)}") )); then
+        echo "Underweight"
+    elif (( $(awk "BEGIN {print ($bmi < 25)}") )); then
+        echo "Normal weight"
+    elif (( $(awk "BEGIN {print ($bmi < 30)}") )); then
+        echo "Overweight"
+    else
+        echo "Obese"
+    fi
+}
+
+# Helper function to translate mRNA codons to amino acids
+translate_codons() {
+    local mrna=$1
+    local protein=""
+    local i=0
+    declare -A CODON_TABLE=(
+        [UUU]=Phe [UUC]=Phe [UUA]=Leu [UUG]=Leu
+        [UCU]=Ser [UCC]=Ser [UCA]=Ser [UCG]=Ser
+        [UAU]=Tyr [UAC]=Tyr [UAA]=STOP [UAG]=STOP
+        [UGU]=Cys [UGC]=Cys [UGA]=STOP [UGG]=Trp
+        [CUU]=Leu [CUC]=Leu [CUA]=Leu [CUG]=Leu
+        [CCU]=Pro [CCC]=Pro [CCA]=Pro [CCG]=Pro
+        [CAU]=His [CAC]=His [CAA]=Gln [CAG]=Gln
+        [CGU]=Arg [CGC]=Arg [CGA]=Arg [CGG]=Arg
+        [AUU]=Ile [AUC]=Ile [AUA]=Ile [AUG]=Met
+        [ACU]=Thr [ACC]=Thr [ACA]=Thr [ACG]=Thr
+        [AAU]=Asn [AAC]=Asn [AAA]=Lys [AAG]=Lys
+        [AGU]=Ser [AGC]=Ser [AGA]=Arg [AGG]=Arg
+        [GUU]=Val [GUC]=Val [GUA]=Val [GUG]=Val
+        [GCU]=Ala [GCC]=Ala [GCA]=Ala [GCG]=Ala
+        [GAU]=Asp [GAC]=Asp [GAA]=Glu [GAG]=Glu
+        [GGU]=Gly [GGC]=Gly [GGA]=Gly [GGG]=Gly
+    )
+    
+    while [ $((i+3)) -le ${#mrna} ]; do
+        codon="${mrna:$i:3}"
+        aa=${CODON_TABLE[$codon]}
+        if [[ "$aa" == "STOP" ]]; then
+            protein+="*"
+            break
+        elif [[ -n "$aa" ]]; then
+            protein+="$aa-"
+        else
+            protein+="???"
+        fi
+        i=$((i+3))
+    done
+    
+    echo "Protein: ${protein%-}"
 }
 
 # --- Credits Menu ---
@@ -2949,3 +3378,222 @@ while true; do
     fi
     echo -e "${CYAN}------------------------------------------${NC}"
 done
+
+# --- Periodic Table Viewer ---
+periodic_table_viewer() {
+    while true; do
+        clear
+        echo -e "${GREEN}=========================================="
+        echo "       PERIODIC TABLE VIEWER"
+        echo -e "==========================================${NC}"
+        echo "[1] Search by Symbol (e.g., Fe)"
+        echo "[2] Search by Name (e.g., Iron)"
+        echo "[3] Search by Atomic Number"
+        echo "[4] Browse All Elements"
+        echo "[0] Back to Chemistry Menu"
+        echo "------------------------------------------"
+        read -p "Select Option: " pt_choice
+        
+        case $pt_choice in
+            1)
+                read -p "Enter element symbol: " sym
+                sym=$(echo "$sym" | sed 's/\b\(.\)/\u\1/g')
+                local found=false
+                for atomic_num in "${!ELEMENT_DATA[@]}"; do
+                    IFS='|' read -r name symbol mass category phase <<< "${ELEMENT_DATA[$atomic_num]}"
+                    if [[ "${symbol,,}" == "${sym,,}" ]]; then
+                        echo ""
+                        echo "Atomic Number: $atomic_num"
+                        echo "Name: $name"
+                        echo "Symbol: $symbol"
+                        echo "Atomic Mass: $mass u"
+                        echo "Category: $category"
+                        echo "Phase at STP: $phase"
+                        found=true
+                        break
+                    fi
+                done
+                if [[ "$found" == "false" ]]; then
+                    echo "Element '$sym' not found."
+                fi
+                read -p "Press Enter to continue..."
+                ;;
+            2)
+                read -p "Enter element name: " ename
+                ename=$(echo "$ename" | sed 's/\b\(.\)/\u\1/g')
+                local found=false
+                for atomic_num in "${!ELEMENT_DATA[@]}"; do
+                    IFS='|' read -r name symbol mass category phase <<< "${ELEMENT_DATA[$atomic_num]}"
+                    if [[ "${name,,}" == "${ename,,}" ]]; then
+                        echo ""
+                        echo "Atomic Number: $atomic_num"
+                        echo "Name: $name"
+                        echo "Symbol: $symbol"
+                        echo "Atomic Mass: $mass u"
+                        echo "Category: $category"
+                        echo "Phase at STP: $phase"
+                        found=true
+                        break
+                    fi
+                done
+                if [[ "$found" == "false" ]]; then
+                    echo "Element '$ename' not found."
+                fi
+                read -p "Press Enter to continue..."
+                ;;
+            3)
+                read -p "Enter atomic number: " anum
+                if [[ "$anum" =~ ^[0-9]+$ ]] && [[ -n "${ELEMENT_DATA[$anum]}" ]]; then
+                    IFS='|' read -r name symbol mass category phase <<< "${ELEMENT_DATA[$anum]}"
+                    echo ""
+                    echo "Atomic Number: $anum"
+                    echo "Name: $name"
+                    echo "Symbol: $symbol"
+                    echo "Atomic Mass: $mass u"
+                    echo "Category: $category"
+                    echo "Phase at STP: $phase"
+                else
+                    echo "Invalid atomic number or element not found."
+                fi
+                read -p "Press Enter to continue..."
+                ;;
+            4)
+                clear
+                echo "=== Periodic Table (All 118 Elements) ==="
+                echo "No. | Sym | Name             | Mass      | Category"
+                echo "----+-----+------------------+-----------+------------------"
+                for atomic_num in $(seq 1 118); do
+                    if [[ -n "${ELEMENT_DATA[$atomic_num]}" ]]; then
+                        IFS='|' read -r name symbol mass category phase <<< "${ELEMENT_DATA[$atomic_num]}"
+                        printf "%3d | %3s | %-16s | %9s | %s\n" "$atomic_num" "$symbol" "$name" "$mass" "$category"
+                    fi
+                done
+                read -p "Press Enter to continue..."
+                ;;
+            0) return ;;
+            *) echo "Invalid option."; sleep 1 ;;
+        esac
+    done
+}
+
+# Element data: Atomic Number -> "Name|Symbol|Mass|Category|Phase"
+declare -A ELEMENT_DATA=(
+    [1]="Hydrogen|H|1.008|Nonmetal|Gas"
+    [2]="Helium|He|4.0026|Noble Gas|Gas"
+    [3]="Lithium|Li|6.94|Alkali Metal|Solid"
+    [4]="Beryllium|Be|9.0122|Alkaline Earth|Solid"
+    [5]="Boron|B|10.81|Metalloid|Solid"
+    [6]="Carbon|C|12.011|Nonmetal|Solid"
+    [7]="Nitrogen|N|14.007|Nonmetal|Gas"
+    [8]="Oxygen|O|15.999|Nonmetal|Gas"
+    [9]="Fluorine|F|18.998|Halogen|Gas"
+    [10]="Neon|Ne|20.180|Noble Gas|Gas"
+    [11]="Sodium|Na|22.990|Alkali Metal|Solid"
+    [12]="Magnesium|Mg|24.305|Alkaline Earth|Solid"
+    [13]="Aluminum|Al|26.982|Post-transition|Solid"
+    [14]="Silicon|Si|28.085|Metalloid|Solid"
+    [15]="Phosphorus|P|30.974|Nonmetal|Solid"
+    [16]="Sulfur|S|32.06|Nonmetal|Solid"
+    [17]="Chlorine|Cl|35.45|Halogen|Gas"
+    [18]="Argon|Ar|39.948|Noble Gas|Gas"
+    [19]="Potassium|K|39.098|Alkali Metal|Solid"
+    [20]="Calcium|Ca|40.078|Alkaline Earth|Solid"
+    [21]="Scandium|Sc|44.956|Transition|Solid"
+    [22]="Titanium|Ti|47.867|Transition|Solid"
+    [23]="Vanadium|V|50.942|Transition|Solid"
+    [24]="Chromium|Cr|51.996|Transition|Solid"
+    [25]="Manganese|Mn|54.938|Transition|Solid"
+    [26]="Iron|Fe|55.845|Transition|Solid"
+    [27]="Cobalt|Co|58.933|Transition|Solid"
+    [28]="Nickel|Ni|58.693|Transition|Solid"
+    [29]="Copper|Cu|63.546|Transition|Solid"
+    [30]="Zinc|Zn|65.38|Transition|Solid"
+    [31]="Gallium|Ga|69.723|Post-transition|Solid"
+    [32]="Germanium|Ge|72.630|Metalloid|Solid"
+    [33]="Arsenic|As|74.922|Metalloid|Solid"
+    [34]="Selenium|Se|78.971|Nonmetal|Solid"
+    [35]="Bromine|Br|79.904|Halogen|Liquid"
+    [36]="Krypton|Kr|83.798|Noble Gas|Gas"
+    [37]="Rubidium|Rb|85.468|Alkali Metal|Solid"
+    [38]="Strontium|Sr|87.62|Alkaline Earth|Solid"
+    [39]="Yttrium|Y|88.906|Transition|Solid"
+    [40]="Zirconium|Zr|91.224|Transition|Solid"
+    [41]="Niobium|Nb|92.906|Transition|Solid"
+    [42]="Molybdenum|Mo|95.95|Transition|Solid"
+    [43]="Technetium|Tc|98|Transition|Solid"
+    [44]="Ruthenium|Ru|101.07|Transition|Solid"
+    [45]="Rhodium|Rh|102.91|Transition|Solid"
+    [46]="Palladium|Pd|106.42|Transition|Solid"
+    [47]="Silver|Ag|107.87|Transition|Solid"
+    [48]="Cadmium|Cd|112.41|Transition|Solid"
+    [49]="Indium|In|114.82|Post-transition|Solid"
+    [50]="Tin|Sn|118.71|Post-transition|Solid"
+    [51]="Antimony|Sb|121.76|Metalloid|Solid"
+    [52]="Tellurium|Te|127.60|Metalloid|Solid"
+    [53]="Iodine|I|126.90|Halogen|Solid"
+    [54]="Xenon|Xe|131.29|Noble Gas|Gas"
+    [55]="Cesium|Cs|132.91|Alkali Metal|Solid"
+    [56]="Barium|Ba|137.33|Alkaline Earth|Solid"
+    [57]="Lanthanum|La|138.91|Lanthanide|Solid"
+    [58]="Cerium|Ce|140.12|Lanthanide|Solid"
+    [59]="Praseodymium|Pr|140.91|Lanthanide|Solid"
+    [60]="Neodymium|Nd|144.24|Lanthanide|Solid"
+    [61]="Promethium|Pm|145|Lanthanide|Solid"
+    [62]="Samarium|Sm|150.36|Lanthanide|Solid"
+    [63]="Europium|Eu|151.96|Lanthanide|Solid"
+    [64]="Gadolinium|Gd|157.25|Lanthanide|Solid"
+    [65]="Terbium|Tb|158.93|Lanthanide|Solid"
+    [66]="Dysprosium|Dy|162.50|Lanthanide|Solid"
+    [67]="Holmium|Ho|164.93|Lanthanide|Solid"
+    [68]="Erbium|Er|167.26|Lanthanide|Solid"
+    [69]="Thulium|Tm|168.93|Lanthanide|Solid"
+    [70]="Ytterbium|Yb|173.05|Lanthanide|Solid"
+    [71]="Lutetium|Lu|174.97|Lanthanide|Solid"
+    [72]="Hafnium|Hf|178.49|Transition|Solid"
+    [73]="Tantalum|Ta|180.95|Transition|Solid"
+    [74]="Tungsten|W|183.84|Transition|Solid"
+    [75]="Rhenium|Re|186.21|Transition|Solid"
+    [76]="Osmium|Os|190.23|Transition|Solid"
+    [77]="Iridium|Ir|192.22|Transition|Solid"
+    [78]="Platinum|Pt|195.08|Transition|Solid"
+    [79]="Gold|Au|196.97|Transition|Solid"
+    [80]="Mercury|Hg|200.59|Transition|Liquid"
+    [81]="Thallium|Tl|204.38|Post-transition|Solid"
+    [82]="Lead|Pb|207.2|Post-transition|Solid"
+    [83]="Bismuth|Bi|208.98|Post-transition|Solid"
+    [84]="Polonium|Po|209|Post-transition|Solid"
+    [85]="Astatine|At|210|Halogen|Solid"
+    [86]="Radon|Rn|222|Noble Gas|Gas"
+    [87]="Francium|Fr|223|Alkali Metal|Solid"
+    [88]="Radium|Ra|226|Alkaline Earth|Solid"
+    [89]="Actinium|Ac|227|Actinide|Solid"
+    [90]="Thorium|Th|232.04|Actinide|Solid"
+    [91]="Protactinium|Pa|231.04|Actinide|Solid"
+    [92]="Uranium|U|238.03|Actinide|Solid"
+    [93]="Neptunium|Np|237|Actinide|Solid"
+    [94]="Plutonium|Pu|244|Actinide|Solid"
+    [95]="Americium|Am|243|Actinide|Solid"
+    [96]="Curium|Cm|247|Actinide|Solid"
+    [97]="Berkelium|Bk|247|Actinide|Solid"
+    [98]="Californium|Cf|251|Actinide|Solid"
+    [99]="Einsteinium|Es|252|Actinide|Solid"
+    [100]="Fermium|Fm|257|Actinide|Solid"
+    [101]="Mendelevium|Md|258|Actinide|Solid"
+    [102]="Nobelium|No|259|Actinide|Solid"
+    [103]="Lawrencium|Lr|262|Actinide|Solid"
+    [104]="Rutherfordium|Rf|267|Transition|Solid"
+    [105]="Dubnium|Db|268|Transition|Solid"
+    [106]="Seaborgium|Sg|271|Transition|Solid"
+    [107]="Bohrium|Bh|272|Transition|Solid"
+    [108]="Hassium|Hs|270|Transition|Solid"
+    [109]="Meitnerium|Mt|276|Unknown|Solid"
+    [110]="Darmstadtium|Ds|281|Unknown|Solid"
+    [111]="Roentgenium|Rg|280|Unknown|Solid"
+    [112]="Copernicium|Cn|285|Transition|Solid"
+    [113]="Nihonium|Nh|284|Unknown|Solid"
+    [114]="Flerovium|Fl|289|Post-transition|Solid"
+    [115]="Moscovium|Mc|288|Unknown|Solid"
+    [116]="Livermorium|Lv|293|Unknown|Solid"
+    [117]="Tennessine|Ts|294|Unknown|Solid"
+    [118]="Oganesson|Og|294|Noble Gas|Solid"
+)
