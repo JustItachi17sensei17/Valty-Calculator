@@ -38,6 +38,18 @@ DECIMAL_MARK="dot" # dot, comma
 DIGIT_SEP="off" # on, off
 MULTILINE_FONT="normal" # normal, small
 
+# Variables Storage (A,B,C,D,E,F,x,y,M)
+declare -gA VARIABLES
+VARIABLES[A]=0
+VARIABLES[B]=0
+VARIABLES[C]=0
+VARIABLES[D]=0
+VARIABLES[E]=0
+VARIABLES[F]=0
+VARIABLES[x]=0
+VARIABLES[y]=0
+VARIABLES[M]=0
+
 set -o pipefail # Better error handling in pipes
 touch "$HISTORY_FILE" && chmod 600 "$HISTORY_FILE"
 # Note: History file is preserved between sessions for user convenience
@@ -106,7 +118,7 @@ show_header() {
     echo -e "  ${MAGENTA}╠══════════════════════════════════════════════╣${NC}${GRAY}█${NC}"
     echo -e "  ${MAGENTA}║${WHITE}  [m] Manual    [s] Settings  [k] Credits     ${MAGENTA}║${NC}${GRAY}█${NC}"
     echo -e "  ${MAGENTA}║${WHITE}  [y] History   [u] Units     [e] Equations   ${MAGENTA}║${NC}${GRAY}█${NC}"
-    echo -e "  ${MAGENTA}║${WHITE}  [l] Clear     [q] Quit                      ${MAGENTA}║${NC}${GRAY}█${NC}"
+    echo -e "  ${MAGENTA}║${WHITE}  [v] Variables [l] Clear     [q] Quit        ${MAGENTA}║${NC}${GRAY}█${NC}"
     echo -e "  ${MAGENTA}╚══════════════════════════════════════════════╝${NC}${GRAY}█${NC}"
     echo -e "   ${GRAY}▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀${NC}"
     echo -e "    ${WHITE}Mode: ${YELLOW}${FORMAT}${NC} | ${WHITE}Angle: ${YELLOW}${ANGLE_MODE^^}${NC} | ${WHITE}Prec: ${YELLOW}${PRECISION}${NC} | ${WHITE}Units: ${YELLOW}${UNIT_SYSTEM^^}${NC}"
@@ -970,6 +982,8 @@ show_equation_solver() {
     echo -e "  [T] Statistics                          "
     echo -e "  [B] Table Generator                     "
     echo -e "  [I] Inequality Solver                   "
+    echo -e "  [X] Variable Manager                    "
+    echo -e "  [E] Equation Solver (ax+b=c)            "
     echo -e "  [b] Back to Main OS                     "
     echo -e "${YELLOW}└──────────────────────────────────────────┘${NC}"
     read -p "Select option: " type
@@ -1014,6 +1028,8 @@ show_equation_solver() {
         T) solve_statistics ;;
         B) solve_table ;;
         I) solve_inequality ;;
+        X) manage_variables ;;
+        E) solve_equation ;;
         *) echo -e "${RED}Invalid option.${NC}" ;;
     esac
     read -p "Press any key to continue..." -n1 -s
@@ -2085,6 +2101,140 @@ matrix_options() {
     [[ "${cont,,}" == "y" ]] && { matrix_options; return; }
 }
 
+# --- Variable Manager ---
+manage_variables() {
+    echo -e "${YELLOW}┌──────────────────────────────────────────┐${NC}"
+    echo -e "${YELLOW}│${WHITE}       VARIABLE MANAGER                ${YELLOW}│${NC}"
+    echo -e "${YELLOW}├──────────────────────────────────────────┤${NC}"
+    echo -e "  Stored Variables: A, B, C, D, E, F, x, y, M"
+    echo -e "${YELLOW}├──────────────────────────────────────────┤${NC}"
+    echo -e "  [1] Store Value to Variable           "
+    echo -e "  [2] Recall Variable Value             "
+    echo -e "  [3] Clear Variable                    "
+    echo -e "  [4] Clear All Variables               "
+    echo -e "  [5] List All Variables                "
+    echo -e "  [b] Back to Main Menu                 "
+    echo -e "${YELLOW}└──────────────────────────────────────────┘${NC}"
+    read -p "Select option: " opt
+
+    case $opt in
+        1)
+            echo -e "Available: A, B, C, D, E, F, x, y, M"
+            read -p "Variable name: " vname
+            if [[ ! "$vname" =~ ^[ABCDEFxMyM]$ ]]; then
+                echo -e "${RED}Invalid variable name.${NC}"
+                return
+            fi
+            read -p "Value (or 'ans'): " val
+            [[ "${val,,}" == "ans" ]] && val=$LAST_RESULT
+            if ! is_num "$val"; then
+                echo -e "${RED}Invalid numeric value.${NC}"
+                return
+            fi
+            VARIABLES[$vname]=$val
+            echo -e "${GREEN}Stored: $vname = $(format_result "$val")${NC}"
+            ;;
+        2)
+            echo -e "Available: A, B, C, D, E, F, x, y, M"
+            read -p "Variable name: " vname
+            if [[ ! "$vname" =~ ^[ABCDEFxMyM]$ ]]; then
+                echo -e "${RED}Invalid variable name.${NC}"
+                return
+            fi
+            echo -e "${GREEN}$vname = $(format_result "${VARIABLES[$vname]}")${NC}"
+            ;;
+        3)
+            echo -e "Available: A, B, C, D, E, F, x, y, M"
+            read -p "Variable to clear: " vname
+            if [[ ! "$vname" =~ ^[ABCDEFxMyM]$ ]]; then
+                echo -e "${RED}Invalid variable name.${NC}"
+                return
+            fi
+            VARIABLES[$vname]=0
+            echo -e "${GREEN}Cleared: $vname = 0${NC}"
+            ;;
+        4)
+            for v in A B C D E F x y M; do
+                VARIABLES[$v]=0
+            done
+            echo -e "${GREEN}All variables cleared.${NC}"
+            ;;
+        5)
+            echo -e "${CYAN}Current Variable Values:${NC}"
+            for v in A B C D E F x y M; do
+                echo -e "  $v = $(format_result "${VARIABLES[$v]}")"
+            done
+            ;;
+        b|B)
+            return
+            ;;
+        *)
+            echo -e "${RED}Invalid option.${NC}"
+            ;;
+    esac
+    read -p " Continue with variables? (y/n): " cont
+    [[ "${cont,,}" == "y" ]] && { manage_variables; return; }
+}
+
+# --- Equation Solver (Single Variable) ---
+solve_equation() {
+    echo -e "${CYAN}--- EQUATION SOLVER ---${NC}"
+    echo -e " Solves linear equations in one variable"
+    echo -e " Format: ax + b = c  or  expression = expression"
+    echo -e ""
+    echo -e " Enter equation (use 'x' as unknown):"
+    read -p "Equation: " eq
+    
+    # Check for '=' sign
+    if [[ ! "$eq" =~ = ]]; then
+        echo -e "${RED}Equation must contain '=' sign.${NC}"
+        return
+    fi
+    
+    # Split by '='
+    local lhs="${eq%%=*}"
+    local rhs="${eq#*=}"
+    
+    # Simple linear form: ax+b=c or ax=b+c etc.
+    # Normalize: collect x terms on left, constants on right
+    
+    # Check if it's a simple form like "ax+b=c"
+    if [[ "$lhs" =~ ^(-?[0-9.]*)(\*)?x([+-][0-9.]*)?$ ]]; then
+        local a_part="${BASH_REMATCH[1]}"
+        local op_part="${BASH_REMATCH[3]}"
+        
+        [[ -z "$a_part" ]] && a_part="1"
+        [[ "$a_part" == "-" ]] && a_part="-1"
+        
+        local b_val=0
+        if [[ -n "$op_part" ]]; then
+            b_val="$op_part"
+        fi
+        
+        # Now we have: a*x + b = rhs
+        # Solution: x = (rhs - b) / a
+        if ! is_num "$a_part" || ! is_num "$b_val" || ! is_num "$rhs"; then
+            echo -e "${RED}Invalid equation format.${NC}"
+            echo -e "${YELLOW}Try: 2x+3=7  or  5x-4=10${NC}"
+            return
+        fi
+        
+        local result=$(awk "BEGIN { printf \"%.15g\", ($rhs - $b_val) / $a_part }")
+        echo -e "${GREEN}Solution: x = $(format_result "$result")${NC}"
+        
+        # Check degree hint
+        if [[ "$eq" =~ x\^([2-9]) ]]; then
+            echo -e "${YELLOW}Note: Higher degree detected. Use polynomial solver for all roots.${NC}"
+        fi
+        return
+    fi
+    
+    # More complex parsing would go here
+    echo -e "${YELLOW}Complex equation detected.${NC}"
+    echo -e "${CYAN}For now, please use the form: ax+b=c${NC}"
+    echo -e "${YELLOW}Example: 2x+5=13${NC}"
+}
+
 # --- Vector Calculator ---
 solve_vector() {
     echo -e "${CYAN}--- VECTOR CALCULATOR ---${NC}"
@@ -2510,6 +2660,8 @@ while true; do
         show_credits; continue
     elif [[ "$input" == "e" ]]; then
         show_equation_solver; continue
+    elif [[ "$input" == "v" ]]; then
+        manage_variables; continue
     # Direct Chapter Jumps (Fluent Shortcuts)
     elif [[ "$input" =~ ^e[1-5]$ ]]; then
         case ${input:1} in
