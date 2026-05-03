@@ -290,6 +290,7 @@ fi
     # Dynamic padding for the box
     local line=" Result: $final_result"
     local pad=$((46 - ${#line}))
+    (( pad < 0 )) && pad=0
     printf "%${pad}s${MAGENTA}║${NC}${GRAY}█${NC}\n" ""
     echo -e "  ${MAGENTA}╚══════════════════════════════════════════════╝${NC}${GRAY}█${NC}"
     echo -e "   ${GRAY}▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀${NC}"
@@ -1932,7 +1933,7 @@ matrix_options() {
                     mat[$((i*n+j))]=${row[$j]}
                 done
             done
-            matref_size=$n
+            ${!sizeref}=$n
             echo -e "${GREEN}$matref defined.${NC}"
             ;;
         2)
