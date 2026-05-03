@@ -202,12 +202,20 @@ fi
         -e 's/([0-9.]+)\(/\1*(/g' -e 's/\)([0-9.]+)/)*\1/g' -e 's/\)\(/)*(/g' \
         -e 's/([0-9.]+)(pi|ans|sin|cos|tan|ln|log|exp|sqrt)/\1*\2/g')
 
-    # 4. Handle Constants (Curriculum Accurate)
+    # 4. Handle Constants (Curriculum Accurate + Extended Scientific)
     local PI_VAL="3.14159265358979323846"
     expr=$(echo "$expr" | sed -E \
-        -e "s/\bpi\b/$PI_VAL/g" -e 's/\be\b/2.71828182845905/g' -e 's/\bc\b/(3*10^8)/g' \
-        -e 's/\bG\b/(6.674*10^-11)/g' -e 's/\bh\b/(6.626*10^-34)/g' -e 's/\bqe\b/(1.602*10^-19)/g' \
-        -e 's/\bNa\b/(6.022*10^23)/g' -e 's/\bkb\b/(1.381*10^-23)/g')
+        -e "s/\bpi\b/$PI_VAL/g" -e 's/\be\b/2.71828182845905/g' \
+        -e 's/\bc\b/(2.99792458*10^8)/g' -e 's/\bG\b/(6.67430*10^-11)/g' \
+        -e 's/\bh\b/(6.62607015*10^-34)/g' -e 's/\bqe\b/(1.602176634*10^-19)/g' \
+        -e 's/\bNa\b/(6.02214076*10^23)/g' -e 's/\bkb\b/(1.380649*10^-23)/g' \
+        -e 's/\bmu0\b/(1.25663706212*10^-6)/g' -e 's/\beps0\b/(8.8541878128*10^-12)/g' \
+        -e 's/\bme\b/(9.1093837015*10^-31)/g' -e 's/\bmp\b/(1.67262192369*10^-27)/g' \
+        -e 's/\bmn\b/(1.67492749804*10^-27)/g' -e 's/\bR\b/(8.314462618)/g' \
+        -e 's/\bF\b/(96485.33212)/g' -e 's/\bstefan\b/(5.670374419*10^-8)/g' \
+        -e 's/\brydberg\b/(1.0973731568160*10^7)/g' -e 's/\bbohr\b/(5.29177210903*10^-11)/g' \
+        -e 's/\bg0\b/(9.80665)/g' -e 's/\batm\b/(1.01325*10^5)/g' \
+        -e 's/\bRy\b/(2.1798723611035*10^-18)/g' -e 's/\blambda_c\b/(2.42631023867*10^-12)/g')
 
     # 5. Replace 'ans' with the last result
     expr=${expr//ans/"$LAST_RESULT"}
@@ -1333,7 +1341,13 @@ solve_complex() {
     echo -e " Example: 3+4i -> enter '3 4 +'"
     echo -e " [1] Add  [2] Subtract  [3] Multiply  [4] Divide"
     echo -e " [5] Modulus  [6] Conjugate  [7] Polar Form"
+    echo -e " [O] Options (Arg, Real/Imag, Convert, Hyperbolic)"
     read -p "Select operation: " op
+
+    if [[ "${op^^}" == "O" ]]; then
+        complex_options
+        return
+    fi
     
     case $op in
         [1-4])
@@ -1737,7 +1751,14 @@ solve_matrix() {
     echo -e " [3] Determinant"
     echo -e " [4] Transpose"
     echo -e " [5] Inverse (2×2, 3×3)"
+    echo -e " [O] Options (Define, Edit, Recall, Det, Trans, Identity)"
     read -p "Select operation: " op
+
+    if [[ "${op^^}" == "O" ]]; then
+        matrix_options
+        return
+    fi
+
     
     read -p "Enter matrix size (1-4): " n
     if ! [[ "$n" =~ ^[1-4]$ ]]; then echo -e "${RED}Size must be 1-4.${NC}"; return; fi
@@ -1943,13 +1964,14 @@ matrix_options() {
             fi
             echo -e "Enter $matref (${n}×${n}):"
             local -n mat=$matref
+            local sizeref="${matref}_size"
             for ((i=0; i<n; i++)); do
                 read -p "Row $((i+1)): " -a row
                 for ((j=0; j<n; j++)); do
                     mat[$((i*n+j))]=${row[$j]}
                 done
             done
-            ${!sizeref}=$n
+            eval "${sizeref}=\$n"
             echo -e "${GREEN}$matref defined.${NC}"
             ;;
         2)
