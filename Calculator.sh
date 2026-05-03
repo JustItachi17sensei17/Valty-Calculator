@@ -38,6 +38,18 @@ DECIMAL_MARK="dot" # dot, comma
 DIGIT_SEP="off" # on, off
 MULTILINE_FONT="normal" # normal, small
 
+# Variables Storage (A,B,C,D,E,F,x,y,M)
+declare -gA VARIABLES
+VARIABLES[A]=0
+VARIABLES[B]=0
+VARIABLES[C]=0
+VARIABLES[D]=0
+VARIABLES[E]=0
+VARIABLES[F]=0
+VARIABLES[x]=0
+VARIABLES[y]=0
+VARIABLES[M]=0
+
 set -o pipefail # Better error handling in pipes
 touch "$HISTORY_FILE" && chmod 600 "$HISTORY_FILE"
 # Note: History file is preserved between sessions for user convenience
@@ -106,7 +118,7 @@ show_header() {
     echo -e "  ${MAGENTA}╠══════════════════════════════════════════════╣${NC}${GRAY}█${NC}"
     echo -e "  ${MAGENTA}║${WHITE}  [m] Manual    [s] Settings  [k] Credits     ${MAGENTA}║${NC}${GRAY}█${NC}"
     echo -e "  ${MAGENTA}║${WHITE}  [y] History   [u] Units     [e] Equations   ${MAGENTA}║${NC}${GRAY}█${NC}"
-    echo -e "  ${MAGENTA}║${WHITE}  [l] Clear     [q] Quit                      ${MAGENTA}║${NC}${GRAY}█${NC}"
+    echo -e "  ${MAGENTA}║${WHITE}  [v] Variables [l] Clear     [q] Quit        ${MAGENTA}║${NC}${GRAY}█${NC}"
     echo -e "  ${MAGENTA}╚══════════════════════════════════════════════╝${NC}${GRAY}█${NC}"
     echo -e "   ${GRAY}▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀${NC}"
     echo -e "    ${WHITE}Mode: ${YELLOW}${FORMAT}${NC} | ${WHITE}Angle: ${YELLOW}${ANGLE_MODE^^}${NC} | ${WHITE}Prec: ${YELLOW}${PRECISION}${NC} | ${WHITE}Units: ${YELLOW}${UNIT_SYSTEM^^}${NC}"
@@ -190,12 +202,20 @@ fi
         -e 's/([0-9.]+)\(/\1*(/g' -e 's/\)([0-9.]+)/)*\1/g' -e 's/\)\(/)*(/g' \
         -e 's/([0-9.]+)(pi|ans|sin|cos|tan|ln|log|exp|sqrt)/\1*\2/g')
 
-    # 4. Handle Constants (Curriculum Accurate)
+    # 4. Handle Constants (Curriculum Accurate + Extended Scientific)
     local PI_VAL="3.14159265358979323846"
     expr=$(echo "$expr" | sed -E \
-        -e "s/\bpi\b/$PI_VAL/g" -e 's/\be\b/2.71828182845905/g' -e 's/\bc\b/(3*10^8)/g' \
-        -e 's/\bG\b/(6.674*10^-11)/g' -e 's/\bh\b/(6.626*10^-34)/g' -e 's/\bqe\b/(1.602*10^-19)/g' \
-        -e 's/\bNa\b/(6.022*10^23)/g' -e 's/\bkb\b/(1.381*10^-23)/g')
+        -e "s/\bpi\b/$PI_VAL/g" -e 's/\be\b/2.71828182845905/g' \
+        -e 's/\bc\b/(2.99792458*10^8)/g' -e 's/\bG\b/(6.67430*10^-11)/g' \
+        -e 's/\bh\b/(6.62607015*10^-34)/g' -e 's/\bqe\b/(1.602176634*10^-19)/g' \
+        -e 's/\bNa\b/(6.02214076*10^23)/g' -e 's/\bkb\b/(1.380649*10^-23)/g' \
+        -e 's/\bmu0\b/(1.25663706212*10^-6)/g' -e 's/\beps0\b/(8.8541878128*10^-12)/g' \
+        -e 's/\bme\b/(9.1093837015*10^-31)/g' -e 's/\bmp\b/(1.67262192369*10^-27)/g' \
+        -e 's/\bmn\b/(1.67492749804*10^-27)/g' -e 's/\bR\b/(8.314462618)/g' \
+        -e 's/\bF\b/(96485.33212)/g' -e 's/\bstefan\b/(5.670374419*10^-8)/g' \
+        -e 's/\brydberg\b/(1.0973731568160*10^7)/g' -e 's/\bbohr\b/(5.29177210903*10^-11)/g' \
+        -e 's/\bg0\b/(9.80665)/g' -e 's/\batm\b/(1.01325*10^5)/g' \
+        -e 's/\bRy\b/(2.1798723611035*10^-18)/g' -e 's/\blambda_c\b/(2.42631023867*10^-12)/g')
 
     # 5. Replace 'ans' with the last result
     expr=${expr//ans/"$LAST_RESULT"}
@@ -290,6 +310,7 @@ fi
     # Dynamic padding for the box
     local line=" Result: $final_result"
     local pad=$((46 - ${#line}))
+    (( pad < 0 )) && pad=0
     printf "%${pad}s${MAGENTA}║${NC}${GRAY}█${NC}\n" ""
     echo -e "  ${MAGENTA}╚══════════════════════════════════════════════╝${NC}${GRAY}█${NC}"
     echo -e "   ${GRAY}▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀${NC}"
@@ -969,6 +990,8 @@ show_equation_solver() {
     echo -e "  [T] Statistics                          "
     echo -e "  [B] Table Generator                     "
     echo -e "  [I] Inequality Solver                   "
+    echo -e "  [X] Variable Manager                    "
+    echo -e "  [E] Equation Solver (ax+b=c)            "
     echo -e "  [b] Back to Main OS                     "
     echo -e "${YELLOW}└──────────────────────────────────────────┘${NC}"
     read -p "Select option: " type
@@ -1013,6 +1036,8 @@ show_equation_solver() {
         T) solve_statistics ;;
         B) solve_table ;;
         I) solve_inequality ;;
+        X) manage_variables ;;
+        E) solve_equation ;;
         *) echo -e "${RED}Invalid option.${NC}" ;;
     esac
     read -p "Press any key to continue..." -n1 -s
@@ -1145,6 +1170,238 @@ show_manual() {
     show_manual
 }
 
+# --- Chemistry Data & Helpers ---
+
+# Atomic Masses (Approximate average atomic masses)
+declare -A ATOMIC_MASSES=(
+    ["H"]=1.008 ["He"]=4.0026 ["Li"]=6.94 ["Be"]=9.0122 ["B"]=10.81 ["C"]=12.011 ["N"]=14.007 ["O"]=15.999 ["F"]=18.998 ["Ne"]=20.180
+    ["Na"]=22.990 ["Mg"]=24.305 ["Al"]=26.982 ["Si"]=28.085 ["P"]=30.974 ["S"]=32.06 ["Cl"]=35.45 ["Ar"]=39.948
+    ["K"]=39.098 ["Ca"]=40.078 ["Sc"]=44.956 ["Ti"]=47.867 ["V"]=50.942 ["Cr"]=51.996 ["Mn"]=54.938 ["Fe"]=55.845 ["Co"]=58.933 ["Ni"]=58.693 ["Cu"]=63.546 ["Zn"]=65.38 ["Ga"]=69.723 ["Ge"]=72.630 ["As"]=74.922 ["Se"]=78.971 ["Br"]=79.904 ["Kr"]=83.798
+    ["Rb"]=85.468 ["Sr"]=87.62 ["Y"]=88.906 ["Zr"]=91.224 ["Nb"]=92.906 ["Mo"]=95.95 ["Tc"]=98 ["Ru"]=101.07 ["Rh"]=102.91 ["Pd"]=106.42 ["Ag"]=107.87 ["Cd"]=112.41 ["In"]=114.82 ["Sn"]=118.71 ["Sb"]=121.76 ["Te"]=127.60 ["I"]=126.90 ["Xe"]=131.29
+    ["Cs"]=132.91 ["Ba"]=137.33 ["La"]=138.91 ["Ce"]=140.12 ["Pr"]=140.91 ["Nd"]=144.24 ["Pm"]=145 ["Sm"]=150.36 ["Eu"]=151.96 ["Gd"]=157.25 ["Tb"]=158.93 ["Dy"]=162.50 ["Ho"]=164.93 ["Er"]=167.26 ["Tm"]=168.93 ["Yb"]=173.05 ["Lu"]=174.97
+    ["Hf"]=178.49 ["Ta"]=180.95 ["W"]=183.84 ["Re"]=186.21 ["Os"]=190.23 ["Ir"]=192.22 ["Pt"]=195.08 ["Au"]=196.97 ["Hg"]=200.59 ["Tl"]=204.38 ["Pb"]=207.2 ["Bi"]=208.98 ["Po"]=209 ["At"]=210 ["Rn"]=222
+    ["Fr"]=223 ["Ra"]=226 ["Ac"]=227 ["Th"]=232.04 ["Pa"]=231.04 ["U"]=238.03 ["Np"]=237 ["Pu"]=244 ["Am"]=243 ["Cm"]=247 ["Bk"]=247 ["Cf"]=251 ["Es"]=252 ["Fm"]=257 ["Md"]=258 ["No"]=259 ["Lr"]=262
+    ["Rf"]=267 ["Db"]=268 ["Sg"]=271 ["Bh"]=272 ["Hs"]=270 ["Mt"]=276 ["Ds"]=281 ["Rg"]=280 ["Cn"]=285 ["Nh"]=284 ["Fl"]=289 ["Mc"]=288 ["Lv"]=293 ["Ts"]=294 ["Og"]=294
+)
+
+# Function to parse chemical formula and calculate molar mass
+calculate_molar_mass() {
+    local formula="$1"
+    local total_mass=0
+    local current_element=""
+    local current_count=""
+    local len=${#formula}
+    local i=0
+    
+    while [ $i -lt $len ]; do
+        char="${formula:$i:1}"
+        
+        if [[ "$char" =~ [A-Z] ]]; then
+            if [ -n "$current_element" ]; then
+                local count=${current_count:-1}
+                local mass=${ATOMIC_MASSES[$current_element]}
+                if [ -z "$mass" ]; then
+                    echo "Error: Unknown element '$current_element'" >&2
+                    return 1
+                fi
+                total_mass=$(echo "$total_mass + ($mass * $count)" | bc -l)
+                current_element=""
+                current_count=""
+            fi
+            current_element="$char"
+        elif [[ "$char" =~ [a-z] ]]; then
+            current_element+="$char"
+        elif [[ "$char" =~ [0-9] ]]; then
+            current_count+="$char"
+        fi
+        ((i++))
+    done
+    
+    if [ -n "$current_element" ]; then
+        local count=${current_count:-1}
+        local mass=${ATOMIC_MASSES[$current_element]}
+        if [ -z "$mass" ]; then
+            echo "Error: Unknown element '$current_element'" >&2
+            return 1
+        fi
+        total_mass=$(echo "$total_mass + ($mass * $count)" | bc -l)
+    fi
+    
+    printf "%.4f" "$total_mass"
+}
+
+chemistry_solver() {
+    while true; do
+        clear
+        echo -e "${GREEN}=========================================="
+        echo "       CHEMISTRY SOLVER SUITE"
+        echo -e "==========================================${NC}"
+        echo "[1] Molar Mass Calculator"
+        echo "[2] Stoichiometry (Mole/Mass)"
+        echo "[3] Ideal Gas Law (PV=nRT)"
+        echo "[4] pH / pOH Calculator"
+        echo "[5] Dilution Calculator (C1V1=C2V2)"
+        echo "[6] Half-Life / Decay"
+        echo "[0] Back to Settings"
+        echo "------------------------------------------"
+        read -p "Select Option: " chem_choice
+
+        case $chem_choice in
+            1)
+                clear
+                echo "--- Molar Mass Calculator ---"
+                echo "Enter chemical formula (e.g., H2O, CO2, NaCl):"
+                read -p "Formula: " formula
+                formula=$(echo "$formula" | sed 's/ //g')
+                mass=$(calculate_molar_mass "$formula")
+                if [ $? -eq 0 ]; then
+                    echo "Molar Mass of $formula is: $mass g/mol"
+                else
+                    echo "Calculation failed."
+                fi
+                read -p "Press Enter to continue..."
+                ;;
+            2)
+                clear
+                echo "--- Stoichiometry ---"
+                read -p "Enter Mass of A (g): " mass_a
+                read -p "Enter Molar Mass of A (g/mol): " mm_a
+                read -p "Coefficient of A: " coef_a
+                read -p "Coefficient of B: " coef_b
+                read -p "Molar Mass of B (0 for moles only): " mm_b
+                if [ "$mm_a" == "0" ] || [ "$coef_a" == "0" ]; then
+                    echo "Error: Zero values not allowed."
+                    read -p "Press Enter..."
+                    continue
+                fi
+                moles_a=$(echo "$mass_a / $mm_a" | bc -l)
+                moles_b=$(echo "$moles_a * ($coef_b / $coef_a)" | bc -l)
+                if [ "$mm_b" != "0" ]; then
+                    mass_b=$(echo "$moles_b * $mm_b" | bc -l)
+                    printf "Result: %.4f moles, %.4f g of B\n" "$moles_b" "$mass_b"
+                else
+                    printf "Result: %.4f moles of B\n" "$moles_b"
+                fi
+                read -p "Press Enter to continue..."
+                ;;
+            3)
+                clear
+                echo "--- Ideal Gas Law (PV = nRT) ---"
+                echo "1) Pressure  2) Volume  3) Moles  4) Temperature"
+                read -p "Choice: " gas_choice
+                read -p "R (default 0.0821): " R_val; R_val=${R_val:-0.0821}
+                case $gas_choice in
+                    1) read -p "n, T(K), V(L): " n T V; res=$(echo "($n*$R_val*$T)/$V" | bc -l); echo "P = $res atm" ;;
+                    2) read -p "n, T(K), P(atm): " n T P; res=$(echo "($n*$R_val*$T)/$P" | bc -l); echo "V = $res L" ;;
+                    3) read -p "P(atm), V(L), T(K): " P V T; res=$(echo "($P*$V)/($R_val*$T)" | bc -l); echo "n = $res mol" ;;
+                    4) read -p "P(atm), V(L), n: " P V n; res=$(echo "($P*$V)/($n*$R_val)" | bc -l); echo "T = $res K" ;;
+                esac
+                read -p "Press Enter to continue..."
+                ;;
+            4)
+                clear
+                echo "--- pH / pOH Calculator ---"
+                echo "1) pH from [H+]  2) [H+] from pH  3) pOH from [OH-]  4) pH from pOH"
+                read -p "Choice: " ph_choice
+                case $ph_choice in
+                    1) read -p "[H+]: " c; res=$(echo "scale=4; -l($c)/l(10)" | bc -l); echo "pH = $res" ;;
+                    2) read -p "pH: " p; res=$(echo "scale=4; 10^(-$p)" | bc -l); echo "[H+] = $res M" ;;
+                    3) read -p "[OH-]: " c; res=$(echo "scale=4; -l($c)/l(10)" | bc -l); echo "pOH = $res" ;;
+                    4) read -p "pOH: " p; res=$(echo "scale=4; 14-$p" | bc -l); echo "pH = $res" ;;
+                esac
+                read -p "Press Enter to continue..."
+                ;;
+            5)
+                clear
+                echo "--- Dilution (C1V1=C2V2) ---"
+                echo "Leave unknown blank"
+                read -p "C1: " c1; read -p "V1: " v1; read -p "C2: " c2; read -p "V2: " v2
+                if [ -z "$c1" ]; then res=$(echo "($c2*$v2)/$v1" | bc -l); echo "C1 = $res"
+                elif [ -z "$v1" ]; then res=$(echo "($c2*$v2)/$c1" | bc -l); echo "V1 = $res"
+                elif [ -z "$c2" ]; then res=$(echo "($c1*$v1)/$v2" | bc -l); echo "C2 = $res"
+                elif [ -z "$v2" ]; then res=$(echo "($c1*$v1)/$c2" | bc -l); echo "V2 = $res"
+                else echo "All given: C1V1=$(echo "$c1*$v1"|bc), C2V2=$(echo "$c2*$v2"|bc)"; fi
+                read -p "Press Enter to continue..."
+                ;;
+            6)
+                clear
+                echo "--- Half-Life ---"
+                echo "1) N(t)  2) N0  3) Time  4) Half-life"
+                read -p "Choice: " hl_choice
+                case $hl_choice in
+                    1) read -p "N0, t_half, t: " n0 th t; res=$(echo "$n0*(0.5^($t/$th))" | bc -l); echo "N(t) = $res" ;;
+                    2) read -p "Nt, t_half, t: " nt th t; res=$(echo "$nt/(0.5^($t/$th))" | bc -l); echo "N0 = $res" ;;
+                    3) read -p "N0, Nt, t_half: " n0 nt th; res=$(echo "$th*l($nt/$n0)/l(0.5)" | bc -l); echo "t = $res" ;;
+                    4) read -p "N0, Nt, t: " n0 nt t; res=$(echo "$t*l(0.5)/l($nt/$n0)" | bc -l); echo "t_half = $res" ;;
+                esac
+                read -p "Press Enter to continue..."
+                ;;
+            0) return ;;
+            *) echo "Invalid"; sleep 1 ;;
+        esac
+    done
+}
+
+biology_solver() {
+    while true; do
+        clear
+        echo -e "${BLUE}=========================================="
+        echo "         BIOLOGY SOLVER SUITE"
+        echo -e "==========================================${NC}"
+        echo "[1] Population Growth"
+        echo "[2] Microscopy Mag/FOV"
+        echo "[3] BMI Calculator"
+        echo "[4] DNA Complement"
+        echo "[5] Q10 Coefficient"
+        echo "[0] Back to Settings"
+        echo "------------------------------------------"
+        read -p "Select Option: " bio_choice
+        case $bio_choice in
+            1)
+                clear; echo "--- Population Growth (Nt=N0*e^(rt)) ---"
+                read -p "N0: " n0; read -p "r: " r; read -p "t: " t
+                res=$(echo "$n0*e($r*$t)" | bc -l)
+                printf "Population: %.2f\n" "$res"
+                read -p "Press Enter..." ;;
+            2)
+                clear; echo "--- Microscopy ---"
+                echo "1) Magnification  2) FOV"
+                read -p "Choice: " mc
+                if [ "$mc" == "1" ]; then
+                    read -p "Ocular: " oc; read -p "Objective: " obj
+                    echo "Total Mag: $(($oc*$obj))x"
+                else
+                    read -p "Known FOV: " fl; read -p "Known Mag: " ml; read -p "New Mag: " mn
+                    res=$(echo "$fl*($ml/$mn)" | bc -l)
+                    echo "New FOV: $res"
+                fi
+                read -p "Press Enter..." ;;
+            3)
+                clear; echo "--- BMI ---"
+                echo "1) Metric  2) Imperial"
+                read -p "System: " sys
+                if [ "$sys" == "1" ]; then read -p "kg: " w; read -p "m: " h; res=$(echo "$w/($h*$h)" | bc -l)
+                else read -p "lbs: " w; read -p "in: " h; res=$(echo "703*$w/($h*$h)" | bc -l); fi
+                printf "BMI: %.2f\n" "$res"
+                read -p "Press Enter..." ;;
+            4)
+                clear; echo "--- DNA Complement ---"
+                read -p "Sequence: " seq; seq=$(echo "$seq" | tr 'a-z' 'A-Z')
+                comp=""; for ((i=0;i<${#seq};i++)); do b="${seq:$i:1}"; case $b in A)comp+="T";;T)comp+="A";;C)comp+="G";;G)comp+="C";;*)comp+="$b";;esac; done
+                echo "Original: $seq"; echo "Complement: $comp"
+                read -p "Press Enter..." ;;
+            5)
+                clear; echo "--- Q10 ---"
+                read -p "R1: " r1; read -p "R2: " r2; read -p "T1: " t1; read -p "T2: " t2
+                diff=$(echo "$t2-$t1" | bc -l)
+                if [ "$diff" != "0" ]; then exp=$(echo "10/$diff" | bc -l); ratio=$(echo "$r2/$r1" | bc -l); res=$(echo "e($exp*l($ratio))" | bc -l); echo "Q10 = $res"; fi
+                read -p "Press Enter..." ;;
+            0) return ;;
+            *) echo "Invalid"; sleep 1 ;;
+        esac
+    done
+}
+
 # --- Credits Menu ---
 show_credits() {
     echo -e "${YELLOW}┌──────────────────────────────────────────┐${NC}"
@@ -1155,6 +1412,11 @@ show_credits() {
     echo -e ""
     echo -e "${WHITE}  Code Architect:                          ${NC}"
     echo -e "${MAGENTA}  Antigravity (AI Assistant)               ${NC}"
+    echo -e ""
+    echo -e "${WHITE}  Features: Scientific, Complex, Matrix,   ${NC}"
+    echo -e "${WHITE}            Base-N, Equation Solver,       ${NC}"
+    echo -e "${WHITE}            Statistics, Tables, Chemistry, ${NC}"
+    echo -e "${WHITE}            Biology Solvers                ${NC}"
     echo -e "${YELLOW}├──────────────────────────────────────────┤${NC}"
     echo -e "${WHITE}  [b] Back                                 ${NC}"
     echo -e "${YELLOW}└──────────────────────────────────────────┘${NC}"
@@ -1196,6 +1458,9 @@ settings_menu() {
         echo -e "${WHITE}  [D] Display Format:  ${CYAN}${FORMAT}${NC}"
         echo -e "${WHITE}  [E] Precision:       ${CYAN}${PRECISION}${NC}"
         echo -e "${WHITE}  [F] Unit System:     ${CYAN}${UNIT_SYSTEM^^}${NC}"
+        echo -e "${WHITE}  ── Specialized Solvers ───────────────────────────  ${NC}"
+        echo -e "${WHITE}  [G] Chemistry Solver ${NC}"
+        echo -e "${WHITE}  [H] Biology Solver   ${NC}"
         echo -e "${WHITE}  ──────────────────────────────────────────────────  ${NC}"
         echo -e "${WHITE}  [Q] Back to Main Menu                              ${NC}"
         echo -e "${YELLOW}└────────────────────────────────────────────────────┘${NC}"
@@ -1203,6 +1468,8 @@ settings_menu() {
         read -p "Select option: " opt
         
         case $opt in
+            G) chemistry_solver ;;
+            H) biology_solver ;;
             1) # Input Mode
                 echo -e "${YELLOW}Input Modes:${NC}"
                 echo -e "  [1] MathI  - Math input (natural display)"
@@ -1316,7 +1583,13 @@ solve_complex() {
     echo -e " Example: 3+4i -> enter '3 4 +'"
     echo -e " [1] Add  [2] Subtract  [3] Multiply  [4] Divide"
     echo -e " [5] Modulus  [6] Conjugate  [7] Polar Form"
+    echo -e " [O] Options (Arg, Real/Imag, Convert, Hyperbolic)"
     read -p "Select operation: " op
+
+    if [[ "${op^^}" == "O" ]]; then
+        complex_options
+        return
+    fi
     
     case $op in
         [1-4])
@@ -1388,6 +1661,128 @@ solve_complex() {
     [[ "${again,,}" == "y" ]] && { solve_complex; return; }
 }
 
+# --- Complex Options Menu ---
+complex_options() {
+    echo -e "${YELLOW}┌──────────────────────────────────────────┐${NC}"
+    echo -e "${YELLOW}│${WHITE}       COMPLEX OPTIONS MENU          ${YELLOW}│${NC}"
+    echo -e "${YELLOW}├──────────────────────────────────────────┤${NC}"
+    echo -e "  [1] Argument (Angle)                    "
+    echo -e "  [2] Real Part                           "
+    echo -e "  [3] Imaginary Part                      "
+    echo -e "  [4] Convert to r<θ (Polar)              "
+    echo -e "  [5] Convert to a+bi (Rectangular)       "
+    echo -e "  [6] Angle Unit (Deg/Rad/Grad)           "
+    echo -e "  [7] Hyperbolic Functions                "
+    echo -e "  [8] Engineering Symbols                 "
+    echo -e "  [b] Back to Complex Calculator          "
+    echo -e "${YELLOW}└──────────────────────────────────────────┘${NC}"
+    read -p "Select option: " opt
+
+    case $opt in
+        [1-5])
+            read -p "Enter complex number (a b sign): " a b s
+            if ! is_num "$a" || ! is_num "$b"; then
+                echo -e "${RED}Invalid input.${NC}"; return
+            fi
+            [[ "$s" == "-" ]] && b=$(awk "BEGIN { print -$b }")
+            
+            local r=$(awk "BEGIN { printf \"%.15g\", sqrt(($a^2) + ($b^2)) }")
+            local theta_rad=$(awk "BEGIN { printf \"%.15g\", atan2($b, $a) }")
+            local theta_deg=$(awk "BEGIN { printf \"%.15g\", $theta_rad * 180 / 3.14159265358979 }")
+            local theta_grad=$(awk "BEGIN { printf \"%.15g\", $theta_rad * 200 / 3.14159265358979 }")
+            
+            case $opt in
+                1)
+                    echo -e "${GREEN}Argument:${NC}"
+                    echo -e "  Degrees:  $(format_result "$theta_deg")°"
+                    echo -e "  Radians:  $(format_result "$theta_rad") rad"
+                    echo -e "  Gradians: $(format_result "$theta_grad") grad"
+                    ;;
+                2)
+                    echo -e "${GREEN}Real Part: $(format_result "$a")${NC}"
+                    ;;
+                3)
+                    echo -e "${GREEN}Imaginary Part: $(format_result "$b")${NC}"
+                    ;;
+                4)
+                    echo -e "${GREEN}Polar Form (r<θ):${NC}"
+                    echo -e "  r = $(format_result "$r")"
+                    case $ANGLE_UNIT in
+                        deg) echo -e "  θ = $(format_result "$theta_deg")°" ;;
+                        rad) echo -e "  θ = $(format_result "$theta_rad") rad" ;;
+                        grad) echo -e "  θ = $(format_result "$theta_grad") grad" ;;
+                    esac
+                    echo -e "  Result: $(format_result "$r")<$(format_result "$theta_deg")°"
+                    ;;
+                5)
+                    local real_fmt=$(format_result "$a")
+                    local imag_sign="+"
+                    local imag_abs=$b
+                    if (( $(awk "BEGIN { print ($b < 0) }") )); then
+                        imag_sign="-"
+                        imag_abs=$(awk "BEGIN { print -$b }")
+                    fi
+                    echo -e "${GREEN}Rectangular Form (a+bi):${NC}"
+                    echo -e "  Result: ${real_fmt}${imag_sign}$(format_result "$imag_abs")i"
+                    ;;
+            esac
+            ;;
+        6)
+            echo -e "${CYAN}Current Angle Unit: ${YELLOW}$ANGLE_UNIT${NC}"
+            echo -e " [1] Degrees  [2] Radians  [3] Gradians"
+            read -p "Select: " au
+            case $au in
+                1) ANGLE_UNIT="deg"; echo -e "${GREEN}Set to Degrees${NC}" ;;
+                2) ANGLE_UNIT="rad"; echo -e "${GREEN}Set to Radians${NC}" ;;
+                3) ANGLE_UNIT="grad"; echo -e "${GREEN}Set to Gradians${NC}" ;;
+                *) echo -e "${RED}Invalid option.${NC}" ;;
+            esac
+            ;;
+        7)
+            echo -e "${CYAN}--- Hyperbolic Functions ---${NC}"
+            echo -e " Enter real value x:"
+            read -p "x: " x
+            if ! is_num "$x"; then
+                echo -e "${RED}Invalid input.${NC}"; return
+            fi
+            local sinh=$(awk "BEGIN { printf \"%.15g\", (exp($x) - exp(-$x)) / 2 }")
+            local cosh=$(awk "BEGIN { printf \"%.15g\", (exp($x) + exp(-$x)) / 2 }")
+            local tanh=$(awk "BEGIN { printf \"%.15g\", (exp($x) - exp(-$x)) / (exp($x) + exp(-$x)) }")
+            echo -e "${GREEN}sinh($x) = $(format_result "$sinh")${NC}"
+            echo -e "${GREEN}cosh($x) = $(format_result "$cosh")${NC}"
+            echo -e "${GREEN}tanh($x) = $(format_result "$tanh")${NC}"
+            ;;
+        8)
+            echo -e "${CYAN}--- Engineering Symbols ---${NC}"
+            ENG_SYMBOL="on"
+            echo -e " Engineering symbols enabled"
+            echo -e " T(10^12), G(10^9), M(10^6), k(10^3)"
+            echo -e " c(10^-2), m(10^-3), u(10^-6), n(10^-9), p(10^-12)"
+            read -p "Enter value with suffix: " val
+            local converted=$(echo "$val" | sed -E \
+                -e 's/([0-9.]+)T/\1*1e12/g' \
+                -e 's/([0-9.]+)G/\1*1e9/g' \
+                -e 's/([0-9.]+)M/\1*1e6/g' \
+                -e 's/([0-9.]+)k/\1*1e3/g' \
+                -e 's/([0-9.]+)c/\1*1e-2/g' \
+                -e 's/([0-9.]+)m/\1*1e-3/g' \
+                -e 's/([0-9.]+)u/\1*1e-6/g' \
+                -e 's/([0-9.]+)n/\1*1e-9/g' \
+                -e 's/([0-9.]+)p/\1*1e-12/g')
+            local result=$(awk "BEGIN { printf \"%.15g\", $converted }")
+            echo -e "${GREEN}Result: $(format_result "$result")${NC}"
+            ;;
+        b|B)
+            return
+            ;;
+        *)
+            echo -e "${RED}Invalid option.${NC}"
+            ;;
+    esac
+    read -p " Continue with options? (y/n): " cont
+    [[ "${cont,,}" == "y" ]] && { complex_options; return; }
+}
+
 # --- Base-N Converter ---
 solve_base_n() {
     echo -e "${CYAN}--- BASE-N CONVERTER ---${NC}"
@@ -1396,7 +1791,13 @@ solve_base_n() {
     echo -e " [3] Hexadecimal to Decimal/Bin/Oct"
     echo -e " [4] Octal to Decimal/Bin/Hex"
     echo -e " [5] Custom Base Conversion"
+    echo -e " [O] Options (Logic Ops, Neg, NOT)"
     read -p "Select conversion type: " ctype
+
+    if [[ "${ctype^^}" == "O" ]]; then
+        base_n_options
+        return
+    fi
     
     case $ctype in
         1)
@@ -1463,6 +1864,126 @@ solve_base_n() {
     [[ "${again,,}" == "y" ]] && { solve_base_n; return; }
 }
 
+# --- Base-N Options Menu ---
+base_n_options() {
+    echo -e "${YELLOW}┌──────────────────────────────────────────┐${NC}"
+    echo -e "${YELLOW}│${WHITE}       BASE-N OPTIONS MENU             ${YELLOW}│${NC}"
+    echo -e "${YELLOW}├──────────────────────────────────────────┤${NC}"
+    echo -e "  [1] NOT (Bitwise Complement)            "
+    echo -e "  [2] AND                                 "
+    echo -e "  [3] OR                                  "
+    echo -e "  [4] XOR                                 "
+    echo -e "  [5] XNOR                                "
+    echo -e "  [6] NAND                                "
+    echo -e "  [7] Negation (Two's Complement)         "
+    echo -e "  [8] Display Format (d/h/b/o)            "
+    echo -e "  [b] Back to Base-N Converter            "
+    echo -e "${YELLOW}└──────────────────────────────────────────┘${NC}"
+    read -p "Select option: " opt
+
+    case $opt in
+        1)
+            read -p "Enter decimal value: " val
+            if ! [[ "$val" =~ ^-?[0-9]+$ ]]; then
+                echo -e "${RED}Invalid input.${NC}"; return
+            fi
+            local result=$((~val))
+            echo -e "${GREEN}NOT($val) = $result${NC}"
+            echo -e "  Binary: $(echo "obase=2;$result" | bc 2>/dev/null || echo "N/A")${NC}"
+            ;;
+        2)
+            read -p "Enter first decimal value: " a
+            read -p "Enter second decimal value: " b
+            if ! [[ "$a" =~ ^[0-9]+$ && "$b" =~ ^[0-9]+$ ]]; then
+                echo -e "${RED}Invalid input.${NC}"; return
+            fi
+            local result=$((a & b))
+            echo -e "${GREEN}$a AND $b = $result${NC}"
+            echo -e "  Binary: $(echo "obase=2;$result" | bc 2>/dev/null)"
+            ;;
+        3)
+            read -p "Enter first decimal value: " a
+            read -p "Enter second decimal value: " b
+            if ! [[ "$a" =~ ^[0-9]+$ && "$b" =~ ^[0-9]+$ ]]; then
+                echo -e "${RED}Invalid input.${NC}"; return
+            fi
+            local result=$((a | b))
+            echo -e "${GREEN}$a OR $b = $result${NC}"
+            echo -e "  Binary: $(echo "obase=2;$result" | bc 2>/dev/null)"
+            ;;
+        4)
+            read -p "Enter first decimal value: " a
+            read -p "Enter second decimal value: " b
+            if ! [[ "$a" =~ ^[0-9]+$ && "$b" =~ ^[0-9]+$ ]]; then
+                echo -e "${RED}Invalid input.${NC}"; return
+            fi
+            local result=$((a ^ b))
+            echo -e "${GREEN}$a XOR $b = $result${NC}"
+            echo -e "  Binary: $(echo "obase=2;$result" | bc 2>/dev/null)"
+            ;;
+        5)
+            read -p "Enter first decimal value: " a
+            read -p "Enter second decimal value: " b
+            if ! [[ "$a" =~ ^[0-9]+$ && "$b" =~ ^[0-9]+$ ]]; then
+                echo -e "${RED}Invalid input.${NC}"; return
+            fi
+            local result=$((~(a ^ b)))
+            echo -e "${GREEN}$a XNOR $b = $result${NC}"
+            ;;
+        6)
+            read -p "Enter first decimal value: " a
+            read -p "Enter second decimal value: " b
+            if ! [[ "$a" =~ ^[0-9]+$ && "$b" =~ ^[0-9]+$ ]]; then
+                echo -e "${RED}Invalid input.${NC}"; return
+            fi
+            local result=$((~(a & b)))
+            echo -e "${GREEN}$a NAND $b = $result${NC}"
+            ;;
+        7)
+            read -p "Enter decimal value: " val
+            if ! [[ "$val" =~ ^-?[0-9]+$ ]]; then
+                echo -e "${RED}Invalid input.${NC}"; return
+            fi
+            local result=$((-val))
+            echo -e "${GREEN}Neg($val) = $result${NC}"
+            ;;
+        8)
+            echo -e "${CYAN}Display Format Options:${NC}"
+            echo -e "  d = Decimal, h = Hexadecimal, b = Binary, o = Octal"
+            read -p "Enter value: " val
+            read -p "Input format (d/h/b/o): " infmt
+            read -p "Output format (d/h/b/o): " outfmt
+            
+            local dec_val
+            case $infmt in
+                d) dec_val=$val ;;
+                h) dec_val=$((16#$val)) ;;
+                b) dec_val=$((2#$val)) ;;
+                o) dec_val=$((8#$val)) ;;
+                *) echo -e "${RED}Invalid input format.${NC}"; return ;;
+            esac
+            
+            local result
+            case $outfmt in
+                d) result=$dec_val ;;
+                h) result=$(echo "obase=16;$dec_val" | bc) ;;
+                b) result=$(echo "obase=2;$dec_val" | bc) ;;
+                o) result=$(echo "obase=8;$dec_val" | bc) ;;
+                *) echo -e "${RED}Invalid output format.${NC}"; return ;;
+            esac
+            echo -e "${GREEN}Result: $result${NC}"
+            ;;
+        b|B)
+            return
+            ;;
+        *)
+            echo -e "${RED}Invalid option.${NC}"
+            ;;
+    esac
+    read -p " Continue with options? (y/n): " cont
+    [[ "${cont,,}" == "y" ]] && { base_n_options; return; }
+}
+
 # --- Matrix Calculator ---
 solve_matrix() {
     echo -e "${CYAN}--- MATRIX CALCULATOR ---${NC}"
@@ -1472,7 +1993,14 @@ solve_matrix() {
     echo -e " [3] Determinant"
     echo -e " [4] Transpose"
     echo -e " [5] Inverse (2×2, 3×3)"
+    echo -e " [O] Options (Define, Edit, Recall, Det, Trans, Identity)"
     read -p "Select operation: " op
+
+    if [[ "${op^^}" == "O" ]]; then
+        matrix_options
+        return
+    fi
+
     
     read -p "Enter matrix size (1-4): " n
     if ! [[ "$n" =~ ^[1-4]$ ]]; then echo -e "${RED}Size must be 1-4.${NC}"; return; fi
@@ -1643,6 +2171,332 @@ solve_matrix() {
     esac
     read -p " Calculate another matrix? (y/n): " again
     [[ "${again,,}" == "y" ]] && { solve_matrix; return; }
+}
+
+# --- Matrix Options Menu ---
+matrix_options() {
+    # Global matrix storage arrays
+    declare -gA MatA MatB MatC MatD MatAns
+    declare -g MatA_size MatB_size MatC_size MatD_size MatAns_size
+    
+    echo -e "${YELLOW}┌──────────────────────────────────────────┐${NC}"
+    echo -e "${YELLOW}│${WHITE}       MATRIX OPTIONS MENU             ${YELLOW}│${NC}"
+    echo -e "${YELLOW}├──────────────────────────────────────────┤${NC}"
+    echo -e "  [1] Define Matrix (A, B, C, D)            "
+    echo -e "  [2] Edit Matrix                           "
+    echo -e "  [3] Recall Matrix (MatA, B, C, D, Ans)    "
+    echo -e "  [4] Determinant of Stored Matrix          "
+    echo -e "  [5] Transpose of Stored Matrix            "
+    echo -e "  [6] Identity Matrix                       "
+    echo -e "  [7] Angle Unit (Deg/Rad/Grad)             "
+    echo -e "  [8] Hyperbolic Functions                  "
+    echo -e "  [b] Back to Matrix Calculator             "
+    echo -e "${YELLOW}└──────────────────────────────────────────┘${NC}"
+    read -p "Select option: " opt
+
+    case $opt in
+        1)
+            echo -e "Define which matrix?"
+            echo -e " [A] MatA  [B] MatB  [C] MatC  [D] MatD"
+            read -p "Select: " matname
+            local matref="Mat${matname^^}"
+            read -p "Enter size (e.g., 2 for 2x2): " n
+            if ! [[ "$n" =~ ^[1-4]$ ]]; then
+                echo -e "${RED}Size must be 1-4.${NC}"; return
+            fi
+            echo -e "Enter $matref (${n}×${n}):"
+            local -n mat=$matref
+            local sizeref="${matref}_size"
+            for ((i=0; i<n; i++)); do
+                read -p "Row $((i+1)): " -a row
+                for ((j=0; j<n; j++)); do
+                    mat[$((i*n+j))]=${row[$j]}
+                done
+            done
+            eval "${sizeref}=\$n"
+            echo -e "${GREEN}$matref defined.${NC}"
+            ;;
+        2)
+            echo -e "Edit which matrix? (A/B/C/D)"
+            read -p "Select: " matname
+            local matref="Mat${matname^^}"
+            local sizeref="${matref}_size"
+            local -n mat=$matref
+            local n=${!sizeref}
+            if [[ -z "$n" ]]; then
+                echo -e "${RED}Matrix not defined.${NC}"; return
+            fi
+            echo -e "Editing $matref (${n}×${n}):"
+            for ((i=0; i<n; i++)); do
+                read -p "Row $((i+1)): " -a row
+                for ((j=0; j<n; j++)); do
+                    mat[$((i*n+j))]=${row[$j]}
+                done
+            done
+            echo -e "${GREEN}$matref updated.${NC}"
+            ;;
+        3)
+            echo -e "Recall which matrix?"
+            echo -e " [A] MatA  [B] MatB  [C] MatC  [D] MatD  [M] MatAns"
+            read -p "Select: " matname
+            local matref="Mat${matname^^}"
+            [[ "${matname^^}" == "M" ]] && matref="MatAns"
+            local sizeref="${matref}_size"
+            local -n mat=$matref
+            local n=${!sizeref}
+            if [[ -z "$n" ]]; then
+                echo -e "${RED}Matrix not defined.${NC}"; return
+            fi
+            echo -e "${GREEN}$matref:${NC}"
+            for ((i=0; i<n; i++)); do
+                local line=""
+                for ((j=0; j<n; j++)); do
+                    line+="$(awk "BEGIN { printf \"%.4f\", ${mat[$((i*n+j))]} }")  "
+                done
+                echo -e "  $line"
+            done
+            ;;
+        4)
+            echo -e "Determinant of which matrix? (A/B/C/D/Ans)"
+            read -p "Select: " matname
+            local matref="Mat${matname^^}"
+            [[ "${matname^^}" == "ANS" ]] && matref="MatAns"
+            local sizeref="${matref}_size"
+            local -n mat=$matref
+            local n=${!sizeref}
+            if [[ -z "$n" ]]; then
+                echo -e "${RED}Matrix not defined.${NC}"; return
+            fi
+            local det
+            case $n in
+                1) det=${mat[0]} ;;
+                2) det=$(awk "BEGIN { print (${mat[0]} * ${mat[3]}) - (${mat[1]} * ${mat[2]}) }") ;;
+                3) det=$(awk "BEGIN {
+                    print ${mat[0]}*((${mat[4]}*${mat[8]})-(${mat[5]}*${mat[7]})) -
+                         ${mat[1]}*((${mat[3]}*${mat[8]})-(${mat[5]}*${mat[6]})) +
+                         ${mat[2]}*((${mat[3]}*${mat[7]})-(${mat[4]}*${mat[6]}))
+                }") ;;
+                4)
+                    det=$(awk "BEGIN {
+                        a=${mat[0]}; b=${mat[1]}; c=${mat[2]}; d=${mat[3]}
+                        e=${mat[4]}; f=${mat[5]}; g=${mat[6]}; h=${mat[7]}
+                        i=${mat[8]}; j=${mat[9]}; k=${mat[10]}; l=${mat[11]}
+                        m=${mat[12]}; n=${mat[13]}; o=${mat[14]}; p=${mat[15]}
+                        m1=f*(k*p-l*o)-g*(j*p-l*n)+h*(j*o-k*n)
+                        m2=e*(k*p-l*o)-g*(i*p-l*m)+h*(i*o-k*m)
+                        m3=e*(j*p-l*n)-f*(i*p-l*m)+h*(i*n-j*m)
+                        m4=e*(j*o-k*n)-f*(i*o-k*m)+g*(i*n-j*m)
+                        print a*m1 - b*m2 + c*m3 - d*m4
+                    }") ;;
+            esac
+            echo -e "${GREEN}Det($matref) = $(format_result "$det")${NC}"
+            ;;
+        5)
+            echo -e "Transpose of which matrix? (A/B/C/D/Ans)"
+            read -p "Select: " matname
+            local matref="Mat${matname^^}"
+            [[ "${matname^^}" == "ANS" ]] && matref="MatAns"
+            local sizeref="${matref}_size"
+            local -n mat=$matref
+            local n=${!sizeref}
+            if [[ -z "$n" ]]; then
+                echo -e "${RED}Matrix not defined.${NC}"; return
+            fi
+            echo -e "${GREEN}Transpose of $matref:${NC}"
+            for ((j=0; j<n; j++)); do
+                local line=""
+                for ((i=0; i<n; i++)); do
+                    line+="$(awk "BEGIN { printf \"%.4f\", ${mat[$((i*n+j))]} }")  "
+                done
+                echo -e "  $line"
+            done
+            ;;
+        6)
+            read -p "Enter identity matrix size (1-4): " n
+            if ! [[ "$n" =~ ^[1-4]$ ]]; then
+                echo -e "${RED}Size must be 1-4.${NC}"; return
+            fi
+            echo -e "${GREEN}Identity Matrix (${n}×${n}):${NC}"
+            for ((i=0; i<n; i++)); do
+                local line=""
+                for ((j=0; j<n; j++)); do
+                    if [[ $i -eq $j ]]; then
+                        line+="1  "
+                    else
+                        line+="0  "
+                    fi
+                done
+                echo -e "  $line"
+            done
+            ;;
+        7)
+            echo -e "${CYAN}Current Angle Unit: ${YELLOW}$ANGLE_UNIT${NC}"
+            echo -e " [1] Degrees  [2] Radians  [3] Gradians"
+            read -p "Select: " au
+            case $au in
+                1) ANGLE_UNIT="deg"; echo -e "${GREEN}Set to Degrees${NC}" ;;
+                2) ANGLE_UNIT="rad"; echo -e "${GREEN}Set to Radians${NC}" ;;
+                3) ANGLE_UNIT="grad"; echo -e "${GREEN}Set to Gradians${NC}" ;;
+                *) echo -e "${RED}Invalid option.${NC}" ;;
+            esac
+            ;;
+        8)
+            echo -e "${CYAN}--- Hyperbolic Functions ---${NC}"
+            echo -e " Enter real value x:"
+            read -p "x: " x
+            if ! is_num "$x"; then
+                echo -e "${RED}Invalid input.${NC}"; return
+            fi
+            local sinh=$(awk "BEGIN { printf \"%.15g\", (exp($x) - exp(-$x)) / 2 }")
+            local cosh=$(awk "BEGIN { printf \"%.15g\", (exp($x) + exp(-$x)) / 2 }")
+            local tanh=$(awk "BEGIN { printf \"%.15g\", (exp($x) - exp(-$x)) / (exp($x) + exp(-$x)) }")
+            echo -e "${GREEN}sinh($x) = $(format_result "$sinh")${NC}"
+            echo -e "${GREEN}cosh($x) = $(format_result "$cosh")${NC}"
+            echo -e "${GREEN}tanh($x) = $(format_result "$tanh")${NC}"
+            ;;
+        b|B)
+            return
+            ;;
+        *)
+            echo -e "${RED}Invalid option.${NC}"
+            ;;
+    esac
+    read -p " Continue with options? (y/n): " cont
+    [[ "${cont,,}" == "y" ]] && { matrix_options; return; }
+}
+
+# --- Variable Manager ---
+manage_variables() {
+    echo -e "${YELLOW}┌──────────────────────────────────────────┐${NC}"
+    echo -e "${YELLOW}│${WHITE}       VARIABLE MANAGER                ${YELLOW}│${NC}"
+    echo -e "${YELLOW}├──────────────────────────────────────────┤${NC}"
+    echo -e "  Stored Variables: A, B, C, D, E, F, x, y, M"
+    echo -e "${YELLOW}├──────────────────────────────────────────┤${NC}"
+    echo -e "  [1] Store Value to Variable           "
+    echo -e "  [2] Recall Variable Value             "
+    echo -e "  [3] Clear Variable                    "
+    echo -e "  [4] Clear All Variables               "
+    echo -e "  [5] List All Variables                "
+    echo -e "  [b] Back to Main Menu                 "
+    echo -e "${YELLOW}└──────────────────────────────────────────┘${NC}"
+    read -p "Select option: " opt
+
+    case $opt in
+        1)
+            echo -e "Available: A, B, C, D, E, F, x, y, M"
+            read -p "Variable name: " vname
+            if [[ ! "$vname" =~ ^[ABCDEFxMyM]$ ]]; then
+                echo -e "${RED}Invalid variable name.${NC}"
+                return
+            fi
+            read -p "Value (or 'ans'): " val
+            [[ "${val,,}" == "ans" ]] && val=$LAST_RESULT
+            if ! is_num "$val"; then
+                echo -e "${RED}Invalid numeric value.${NC}"
+                return
+            fi
+            VARIABLES[$vname]=$val
+            echo -e "${GREEN}Stored: $vname = $(format_result "$val")${NC}"
+            ;;
+        2)
+            echo -e "Available: A, B, C, D, E, F, x, y, M"
+            read -p "Variable name: " vname
+            if [[ ! "$vname" =~ ^[ABCDEFxMyM]$ ]]; then
+                echo -e "${RED}Invalid variable name.${NC}"
+                return
+            fi
+            echo -e "${GREEN}$vname = $(format_result "${VARIABLES[$vname]}")${NC}"
+            ;;
+        3)
+            echo -e "Available: A, B, C, D, E, F, x, y, M"
+            read -p "Variable to clear: " vname
+            if [[ ! "$vname" =~ ^[ABCDEFxMyM]$ ]]; then
+                echo -e "${RED}Invalid variable name.${NC}"
+                return
+            fi
+            VARIABLES[$vname]=0
+            echo -e "${GREEN}Cleared: $vname = 0${NC}"
+            ;;
+        4)
+            for v in A B C D E F x y M; do
+                VARIABLES[$v]=0
+            done
+            echo -e "${GREEN}All variables cleared.${NC}"
+            ;;
+        5)
+            echo -e "${CYAN}Current Variable Values:${NC}"
+            for v in A B C D E F x y M; do
+                echo -e "  $v = $(format_result "${VARIABLES[$v]}")"
+            done
+            ;;
+        b|B)
+            return
+            ;;
+        *)
+            echo -e "${RED}Invalid option.${NC}"
+            ;;
+    esac
+    read -p " Continue with variables? (y/n): " cont
+    [[ "${cont,,}" == "y" ]] && { manage_variables; return; }
+}
+
+# --- Equation Solver (Single Variable) ---
+solve_equation() {
+    echo -e "${CYAN}--- EQUATION SOLVER ---${NC}"
+    echo -e " Solves linear equations in one variable"
+    echo -e " Format: ax + b = c  or  expression = expression"
+    echo -e ""
+    echo -e " Enter equation (use 'x' as unknown):"
+    read -p "Equation: " eq
+    
+    # Check for '=' sign
+    if [[ ! "$eq" =~ = ]]; then
+        echo -e "${RED}Equation must contain '=' sign.${NC}"
+        return
+    fi
+    
+    # Split by '='
+    local lhs="${eq%%=*}"
+    local rhs="${eq#*=}"
+    
+    # Simple linear form: ax+b=c or ax=b+c etc.
+    # Normalize: collect x terms on left, constants on right
+    
+    # Check if it's a simple form like "ax+b=c"
+    if [[ "$lhs" =~ ^(-?[0-9.]*)(\*)?x([+-][0-9.]*)?$ ]]; then
+        local a_part="${BASH_REMATCH[1]}"
+        local op_part="${BASH_REMATCH[3]}"
+        
+        [[ -z "$a_part" ]] && a_part="1"
+        [[ "$a_part" == "-" ]] && a_part="-1"
+        
+        local b_val=0
+        if [[ -n "$op_part" ]]; then
+            b_val="$op_part"
+        fi
+        
+        # Now we have: a*x + b = rhs
+        # Solution: x = (rhs - b) / a
+        if ! is_num "$a_part" || ! is_num "$b_val" || ! is_num "$rhs"; then
+            echo -e "${RED}Invalid equation format.${NC}"
+            echo -e "${YELLOW}Try: 2x+3=7  or  5x-4=10${NC}"
+            return
+        fi
+        
+        local result=$(awk "BEGIN { printf \"%.15g\", ($rhs - $b_val) / $a_part }")
+        echo -e "${GREEN}Solution: x = $(format_result "$result")${NC}"
+        
+        # Check degree hint
+        if [[ "$eq" =~ x\^([2-9]) ]]; then
+            echo -e "${YELLOW}Note: Higher degree detected. Use polynomial solver for all roots.${NC}"
+        fi
+        return
+    fi
+    
+    # More complex parsing would go here
+    echo -e "${YELLOW}Complex equation detected.${NC}"
+    echo -e "${CYAN}For now, please use the form: ax+b=c${NC}"
+    echo -e "${YELLOW}Example: 2x+5=13${NC}"
 }
 
 # --- Vector Calculator ---
@@ -2070,6 +2924,8 @@ while true; do
         show_credits; continue
     elif [[ "$input" == "e" ]]; then
         show_equation_solver; continue
+    elif [[ "$input" == "v" ]]; then
+        manage_variables; continue
     # Direct Chapter Jumps (Fluent Shortcuts)
     elif [[ "$input" =~ ^e[1-5]$ ]]; then
         case ${input:1} in
