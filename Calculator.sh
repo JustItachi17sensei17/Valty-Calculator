@@ -1283,7 +1283,7 @@ calculate_molar_mass() {
                     echo "Error: Unknown element '$current_element'" >&2
                     return 1
                 fi
-                total_mass=$(echo "$total_mass + ($mass * $count)" | bc -l)
+                total_mass=$(awk "BEGIN {printf \"%.10f\", $total_mass + ($mass * $count)}")
                 current_element=""
                 current_count=""
             fi
@@ -1304,7 +1304,7 @@ calculate_molar_mass() {
             echo "Error: Unknown element '$current_element'" >&2
             return 1
         fi
-        total_mass=$(echo "$total_mass + ($mass * $count)" | bc -l)
+        total_mass=$(awk "BEGIN {printf \"%.10f\", $total_mass + ($mass * $count)}")
     fi
     
     printf "%.4f" "$total_mass"
@@ -1372,10 +1372,10 @@ chemistry_solver() {
                     continue
                 fi
                 
-                moles_a=$(echo "$mass_a / $mm_a" | bc -l)
-                moles_b=$(echo "$moles_a * ($coef_b / $coef_a)" | bc -l)
+                moles_a=$(awk "BEGIN {printf \"%.10f\", $mass_a / $mm_a}")
+                moles_b=$(awk "BEGIN {printf \"%.10f\", $moles_a * ($coef_b / $coef_a)}")
                 if [[ "$mm_b" != "0" ]] && is_num "$mm_b"; then
-                    mass_b=$(echo "$moles_b * $mm_b" | bc -l)
+                    mass_b=$(awk "BEGIN {printf \"%.10f\", $moles_b * $mm_b}")
                     printf "Result: %.4f moles, %.4f g of B\n" "$moles_b" "$mass_b"
                 else
                     printf "Result: %.4f moles of B\n" "$moles_b"
@@ -1398,7 +1398,7 @@ chemistry_solver() {
                         if ! is_num "$n" || ! is_num "$T" || ! is_num "$V" || [[ "$V" == "0" ]]; then
                             echo "Error: Invalid input or division by zero."
                         else
-                            res=$(echo "scale=6; ($n*$R_val*$T)/$V" | bc -l)
+                            res=$(awk "BEGIN {printf \"%.6f\", ($n*$R_val*$T)/$V}")
                             echo "P = $res atm"
                         fi
                         ;;
@@ -1409,7 +1409,7 @@ chemistry_solver() {
                         if ! is_num "$n" || ! is_num "$T" || ! is_num "$P" || [[ "$P" == "0" ]]; then
                             echo "Error: Invalid input or division by zero."
                         else
-                            res=$(echo "scale=6; ($n*$R_val*$T)/$P" | bc -l)
+                            res=$(awk "BEGIN {printf \"%.6f\", ($n*$R_val*$T)/$P}")
                             echo "V = $res L"
                         fi
                         ;;
@@ -1420,7 +1420,7 @@ chemistry_solver() {
                         if ! is_num "$P" || ! is_num "$V" || ! is_num "$T" || [[ "$T" == "0" ]]; then
                             echo "Error: Invalid input or division by zero."
                         else
-                            res=$(echo "scale=6; ($P*$V)/($R_val*$T)" | bc -l)
+                            res=$(awk "BEGIN {printf \"%.6f\", ($P*$V)/($R_val*$T)}")
                             echo "n = $res mol"
                         fi
                         ;;
@@ -1431,7 +1431,7 @@ chemistry_solver() {
                         if ! is_num "$P" || ! is_num "$V" || ! is_num "$n" || [[ "$n" == "0" ]]; then
                             echo "Error: Invalid input or division by zero."
                         else
-                            res=$(echo "scale=6; ($P*$V)/($n*$R_val)" | bc -l)
+                            res=$(awk "BEGIN {printf \"%.6f\", ($P*$V)/($n*$R_val)}")
                             echo "T = $res K"
                         fi
                         ;;
@@ -1450,7 +1450,7 @@ chemistry_solver() {
                         if ! is_num "$c" || (( $(awk "BEGIN {print ($c <= 0)}") )); then
                             echo "Error: Concentration must be positive."
                         else
-                            res=$(echo "scale=4; -l($c)/l(10)" | bc -l)
+                            res=$(awk "BEGIN {printf \"%.4f\", -log($c)/log(10)}")
                             echo "pH = $res"
                         fi
                         ;;
@@ -1459,7 +1459,7 @@ chemistry_solver() {
                         if ! is_num "$p"; then
                             echo "Error: Invalid pH value."
                         else
-                            res=$(echo "scale=6; 10^(-$p)" | bc -l)
+                            res=$(awk "BEGIN {printf \"%.6f\", 10^(-$p)}")
                             echo "[H+] = $res M"
                         fi
                         ;;
@@ -1468,7 +1468,7 @@ chemistry_solver() {
                         if ! is_num "$c" || (( $(awk "BEGIN {print ($c <= 0)}") )); then
                             echo "Error: Concentration must be positive."
                         else
-                            res=$(echo "scale=4; -l($c)/l(10)" | bc -l)
+                            res=$(awk "BEGIN {printf \"%.4f\", -log($c)/log(10)}")
                             echo "pOH = $res"
                         fi
                         ;;
@@ -1477,7 +1477,7 @@ chemistry_solver() {
                         if ! is_num "$p"; then
                             echo "Error: Invalid pOH value."
                         else
-                            res=$(echo "scale=4; 14-$p" | bc -l)
+                            res=$(awk "BEGIN {printf \"%.4f\", 14-$p}")
                             echo "pH = $res"
                         fi
                         ;;
@@ -1496,28 +1496,28 @@ chemistry_solver() {
                 
                 if [ -z "$c1" ]; then
                     if [[ "$v1" == "0" ]]; then echo "Error: V1 cannot be zero."; else
-                        res=$(echo "scale=6; ($c2*$v2)/$v1" | bc -l)
+                        res=$(awk "BEGIN {printf \"%.6f\", ($c2*$v2)/$v1}")
                         echo "C1 = $res"
                     fi
                 elif [ -z "$v1" ]; then
                     if [[ "$c1" == "0" ]]; then echo "Error: C1 cannot be zero."; else
-                        res=$(echo "scale=6; ($c2*$v2)/$c1" | bc -l)
+                        res=$(awk "BEGIN {printf \"%.6f\", ($c2*$v2)/$c1}")
                         echo "V1 = $res"
                     fi
                 elif [ -z "$c2" ]; then
                     if [[ "$v2" == "0" ]]; then echo "Error: V2 cannot be zero."; else
-                        res=$(echo "scale=6; ($c1*$v1)/$v2" | bc -l)
+                        res=$(awk "BEGIN {printf \"%.6f\", ($c1*$v1)/$v2}")
                         echo "C2 = $res"
                     fi
                 elif [ -z "$v2" ]; then
                     if [[ "$c1" == "0" ]]; then echo "Error: C1 cannot be zero."; else
-                        res=$(echo "scale=6; ($c1*$v1)/$c2" | bc -l)
+                        res=$(awk "BEGIN {printf \"%.6f\", ($c1*$v1)/$c2}")
                         echo "V2 = $res"
                     fi
                 else
                     echo "All values provided. Checking equation balance:"
-                    left=$(echo "$c1*$v1" | bc -l)
-                    right=$(echo "$c2*$v2" | bc -l)
+                    left=$(awk "BEGIN {printf \"%.6f\", $c1*$v1}")
+                    right=$(awk "BEGIN {printf \"%.6f\", $c2*$v2}")
                     echo "C1V1 = $left, C2V2 = $right"
                 fi
                 read -p "Press Enter to continue..."
@@ -1536,7 +1536,7 @@ chemistry_solver() {
                         if ! is_num "$n0" || ! is_num "$th" || ! is_num "$t" || [[ "$th" == "0" ]]; then
                             echo "Error: Invalid input."
                         else
-                            res=$(echo "scale=6; $n0*(0.5^($t/$th))" | bc -l)
+                            res=$(awk "BEGIN {printf \"%.6f\", $n0*(0.5^($t/$th))}")
                             echo "N(t) = $res"
                         fi
                         ;;
@@ -1547,7 +1547,7 @@ chemistry_solver() {
                         if ! is_num "$nt" || ! is_num "$th" || ! is_num "$t" || [[ "$th" == "0" ]]; then
                             echo "Error: Invalid input."
                         else
-                            res=$(echo "scale=6; $nt/(0.5^($t/$th))" | bc -l)
+                            res=$(awk "BEGIN {printf \"%.6f\", $nt/(0.5^($t/$th))}")
                             echo "N0 = $res"
                         fi
                         ;;
@@ -1558,7 +1558,7 @@ chemistry_solver() {
                         if ! is_num "$n0" || ! is_num "$nt" || ! is_num "$th" || [[ "$n0" == "0" ]] || [[ "$nt" == "0" ]]; then
                             echo "Error: Invalid input or zero values."
                         else
-                            res=$(echo "scale=6; $th*l($nt/$n0)/l(0.5)" | bc -l)
+                            res=$(awk "BEGIN {printf \"%.6f\", $th*log($nt/$n0)/log(0.5)}")
                             echo "t = $res"
                         fi
                         ;;
@@ -1569,7 +1569,7 @@ chemistry_solver() {
                         if ! is_num "$n0" || ! is_num "$nt" || ! is_num "$t" || [[ "$n0" == "0" ]] || [[ "$nt" == "0" ]]; then
                             echo "Error: Invalid input or zero values."
                         else
-                            res=$(echo "scale=6; $t*l(0.5)/l($nt/$n0)" | bc -l)
+                            res=$(awk "BEGIN {printf \"%.6f\", $t*log(0.5)/log($nt/$n0)}")
                             echo "t_half = $res"
                         fi
                         ;;
@@ -1613,7 +1613,7 @@ biology_solver() {
                         if ! is_num "$n0" || ! is_num "$r" || ! is_num "$t"; then
                             echo "Error: Invalid numeric input."
                         else
-                            res=$(echo "scale=6; $n0*e($r*$t)" | bc -l)
+                            res=$(awk "BEGIN {printf \"%.6f\", $n0*exp($r*$t)}")
                             printf "Final Population: %.2f\n" "$res"
                         fi
                         ;;
@@ -1624,7 +1624,7 @@ biology_solver() {
                         if ! is_num "$nt" || ! is_num "$r" || ! is_num "$t"; then
                             echo "Error: Invalid numeric input."
                         else
-                            res=$(echo "scale=6; $nt/e($r*$t)" | bc -l)
+                            res=$(awk "BEGIN {printf \"%.6f\", $nt/exp($r*$t)}")
                             printf "Initial Population: %.2f\n" "$res"
                         fi
                         ;;
@@ -1635,7 +1635,7 @@ biology_solver() {
                         if ! is_num "$n0" || ! is_num "$nt" || ! is_num "$t" || [[ "$n0" == "0" ]] || [[ "$t" == "0" ]]; then
                             echo "Error: Invalid input or zero values."
                         else
-                            res=$(echo "scale=6; l($nt/$n0)/$t" | bc -l)
+                            res=$(awk "BEGIN {printf \"%.6f\", log($nt/$n0)/$t}")
                             printf "Growth Rate (r): %.6f\n" "$res"
                         fi
                         ;;
@@ -1646,7 +1646,7 @@ biology_solver() {
                         if ! is_num "$n0" || ! is_num "$nt" || ! is_num "$r" || [[ "$n0" == "0" ]] || [[ "$r" == "0" ]]; then
                             echo "Error: Invalid input or zero values."
                         else
-                            res=$(echo "scale=6; l($nt/$n0)/$r" | bc -l)
+                            res=$(awk "BEGIN {printf \"%.6f\", log($nt/$n0)/$r}")
                             printf "Time (t): %.2f\n" "$res"
                         fi
                         ;;
@@ -1674,7 +1674,7 @@ biology_solver() {
                     if ! is_num "$fl" || ! is_num "$ml" || ! is_num "$mn" || [[ "$mn" == "0" ]]; then
                         echo "Error: Invalid input or division by zero."
                     else
-                        res=$(echo "scale=4; $fl*($ml/$mn)" | bc -l)
+                        res=$(awk "BEGIN {printf \"%.4f\", $fl*($ml/$mn)}")
                         echo "New FOV: $res um"
                     fi
                 fi
@@ -1691,7 +1691,7 @@ biology_solver() {
                     if ! is_num "$w" || ! is_num "$h" || [[ "$h" == "0" ]]; then
                         echo "Error: Invalid input."
                     else
-                        res=$(echo "scale=4; $w/($h*$h)" | bc -l)
+                        res=$(awk "BEGIN {printf \"%.4f\", $w/($h*$h)}")
                         bmi_category "$res"
                     fi
                 elif [ "$sys" == "2" ]; then
@@ -1700,7 +1700,7 @@ biology_solver() {
                     if ! is_num "$w" || ! is_num "$h" || [[ "$h" == "0" ]]; then
                         echo "Error: Invalid input."
                     else
-                        res=$(echo "scale=4; 703*$w/($h*$h)" | bc -l)
+                        res=$(awk "BEGIN {printf \"%.4f\", 703*$w/($h*$h)}")
                         bmi_category "$res"
                     fi
                 else
@@ -1757,11 +1757,11 @@ biology_solver() {
                 if ! is_num "$r1" || ! is_num "$r2" || ! is_num "$t1" || ! is_num "$t2"; then
                     echo "Error: Invalid numeric input."
                 else
-                    diff=$(echo "$t2-$t1" | bc -l)
+                    diff=$(awk "BEGIN {printf \"%.6f\", $t2-$t1}")
                     if [[ "$diff" != "0" ]] && (( $(awk "BEGIN {print ($r1 > 0 && $r2 > 0)}") )); then
-                        exp=$(echo "scale=6; 10/$diff" | bc -l)
-                        ratio=$(echo "scale=6; $r2/$r1" | bc -l)
-                        res=$(echo "scale=6; e($exp*l($ratio))" | bc -l)
+                        exp=$(awk "BEGIN {printf \"%.6f\", 10/$diff}")
+                        ratio=$(awk "BEGIN {printf \"%.6f\", $r2/$r1}")
+                        res=$(awk "BEGIN {printf \"%.6f\", exp($exp*log($ratio))}")
                         echo "Q10 = $res"
                     else
                         echo "Error: Temperature difference cannot be zero, rates must be positive."
